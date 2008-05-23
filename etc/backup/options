@@ -1,0 +1,20 @@
+#Backup options
+
+# The command to use for 'tar'. GNU tar required
+TAR=/bin/tar
+USER_BACKUP=/usr/local/bin/user-backup.sh
+
+TAR_EXCLUDE_OPTIONS="-X /etc/backup/excludes"
+
+# Append information for each backup in this file
+BACKUP_INDEX_FILE=bkups.index
+
+BACKUP_GROUP=users
+
+# Compute the MD5 of the file and put it into the backup (TODO)
+# GEN_MD5=y
+
+BACKUP_INDEX_FILE=/var/backup/index
+TAR_DEFAULT_OPTIONS="-pSP"
+
+BACKUP_DIR=/some-disk/backup/

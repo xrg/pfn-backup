@@ -1,0 +1,1 @@
+TAR_EXCLUDE_OPTIONS="--exclude tmp --exclude cache --exclude-caches --exclude empty --exclude spool/squid --exclude lib/rpm --exclude lib/urpmi"
