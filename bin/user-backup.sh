@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# User backup, by P. Christeas, (c) 2005-6
+# This is free software!
+
+
 function decho {
  if [ "$VERBOSE" == "y" ] ; then
 	echo "$@"
@@ -76,7 +80,7 @@ DSTAMP=$(date +'%Y%m%d')
 TSTAMP=$(date -Iminute)
 
 if [ ! -n "$TMP_TAR_DIRS" ] ; then
-	TMP_TAR_DIRS="$HOME/"
+	TMP_TAR_DIRS="$HOME"
 fi
 
 # Code is a unique string in the index file, so that the index file can

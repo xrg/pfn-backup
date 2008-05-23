@@ -1,6 +1,8 @@
 #!/bin/bash
 
 # global backup
+# by P. Christeas, (c) 2005-6
+# This is free software!
 
 #defaults:
 BACKUP_ALL_TFILE=/etc/backup/all.cfg
