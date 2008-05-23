@@ -30,5 +30,13 @@ while read B_USER B_LINE ; do
 	fi
 done
 
+# Quick and dirty set of root's home, so that gpg works
+if [ -z $HOME ] ; then
+	export HOME=/root
+fi
+for FILE in $BACKUP_DIR/*.gz ; do 
+	gpg -o $BACKUP_DIR/gpg/$(basename $FILE) -r 'my_key' -e $FILE && \
+       		rm $FILE
+done 
 
 #eof
