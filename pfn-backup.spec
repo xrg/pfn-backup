@@ -1,10 +1,9 @@
-%define git_repodir /home/panos/build/
 %define git_repo pfn-backup
 %define git_head HEAD
 
 %define name pfn-backup
 %define version 0.1
-%define release 1
+%define release %mkrel 1
 
 Name:		%{name}
 Version:	%{version}
@@ -39,14 +38,32 @@ install -d %{buildroot}%{_sysconfdir}/backup \
 install -D etc/backup/* %{buildroot}%{_sysconfdir}/backup/
 install bin/* %{buildroot}%{_bindir}/
 install sbin/* %{buildroot}%{_sbindir}/
-#install -d %{buildroot}%{_datadir}/a2billing
+install -d %{buildroot}%{_sysconfdir}/cron.daily
+install -d %{buildroot}/var/backup
+
+cat '-' >%{buildroot}%{_sysconfdir}/cron.daily/all-backup.sh  <<EOF
+#!/bin/bash
+nice %{_sbindir}/all-backup.sh
+EOF
+
+touch	%{buildroot}/var/backup/index
 
 %clean
 [ -n "%{buildroot}" -a "%{buildroot}" != / ] && rm -rf %{buildroot}
 
+%pre
+%_pre_groupadd backup
+
+%post
+%create_ghostfile /var/backup/index root backup 664
+
 %files
 %defattr(-,root,root)
 %config(noreplace)	%{_sysconfdir}/backup/*
-%attr(0755,root,users)	%{_bindir}/user-backup.sh
+%attr(0755,root,backup)	%{_bindir}/user-backup.sh
 %attr(0755,root,root)	%{_sbindir}/*
+%attr(0744,root,root)	%{_sysconfdir}/cron.daily/all-backup.sh
+%attr(0664,root,backup) %dir /var/backup
+%attr(0664,root,backup) %ghost /var/backup/index
+
 
