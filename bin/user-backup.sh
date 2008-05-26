@@ -147,6 +147,7 @@ fi
 	echo "$TSTAMP" $TMP_CODE "Backup started now." >> "$BACKUP_INDEX_FILE"
 
 decho "Starting backup.."
+umask 0077
 
 if [ "$DRY_RUN" == "y" ] ; then
 	TMP_PRE_CMD=echo

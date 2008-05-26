@@ -3,7 +3,7 @@
 
 %define name pfn-backup
 %define version 0.1
-%define release %mkrel 1
+%define release %mkrel 2
 
 Name:		%{name}
 Version:	%{version}
@@ -63,7 +63,7 @@ touch	%{buildroot}/var/backup/index
 %attr(0755,root,backup)	%{_bindir}/user-backup.sh
 %attr(0755,root,root)	%{_sbindir}/*
 %attr(0744,root,root)	%{_sysconfdir}/cron.daily/all-backup.sh
-%attr(0664,root,backup) %dir /var/backup
+%attr(0775,root,backup) %dir /var/backup
 %attr(0664,root,backup) %ghost /var/backup/index
 
 
