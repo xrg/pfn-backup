@@ -65,7 +65,3 @@ touch	%{buildroot}/var/backup/index
 %attr(0744,root,root)	%{_sysconfdir}/cron.daily/all-backup.sh
 %attr(0775,root,backup) %dir /var/backup
 %attr(0664,root,backup) %ghost /var/backup/index
-
-%changelog
-* Wed 04 Jun 2008 17:21:12 P. Christeas <p_christ@hol.gr>
-	Fix return code from tar
