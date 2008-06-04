@@ -156,26 +156,34 @@ fi
 if [ -n "$TMP_NEWER" ] ; then
 	#after timestamp
 	decho $TAR -cf $TMP_TAR_FILE $TAR_DEFAULT_OPTIONS $TMP_TAR_OPTIONS $TAR_EXCLUDE_OPTIONS $TMP_NEWER "$TMP_NEWER2" -- $TMP_TAR_DIRS
-	if $TMP_PRE_CMD $TAR -cf $TMP_TAR_FILE $TAR_DEFAULT_OPTIONS $TMP_TAR_OPTIONS $TAR_EXCLUDE_OPTIONS $TMP_NEWER "$TMP_NEWER2" $TMP_TAR_DIRS 2>&1 | filter_tar ; then
+	$TMP_PRE_CMD $TAR -cf $TMP_TAR_FILE $TAR_DEFAULT_OPTIONS $TMP_TAR_OPTIONS $TAR_EXCLUDE_OPTIONS $TMP_NEWER "$TMP_NEWER2" $TMP_TAR_DIRS 
+	TAR_EXIT=$?
+	if [ $TAR_EXIT == 0 ] ; then
 		[ -n "$BACKUP_INDEX_FILE" ] && \
-			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "success at" $(date) >> "$BACKUP_INDEX_FILE"
+			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "success at" $(date) >> "$BACKUP_INDEX_FILE" || \
+				exit $?
 		decho "Backup finished"
 	else
 		[ -n "$BACKUP_INDEX_FILE" ] && \
 			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "FAILED." >> "$BACKUP_INDEX_FILE"
 		decho "Backup FAILED!"
+		exit $TAR_EXIT
 	fi
 else
 	#full backup
 	decho $TAR -cf $TMP_TAR_FILE $TAR_DEFAULT_OPTIONS $TMP_TAR_OPTIONS $TAR_EXCLUDE_OPTIONS -- $TMP_TAR_DIRS
-	if $TMP_PRE_CMD $TAR -cf $TMP_TAR_FILE $TAR_DEFAULT_OPTIONS $TMP_TAR_OPTIONS $TAR_EXCLUDE_OPTIONS $TMP_TAR_DIRS 2| filter_tar ; then
+	$TMP_PRE_CMD $TAR -cf $TMP_TAR_FILE $TAR_DEFAULT_OPTIONS $TMP_TAR_OPTIONS $TAR_EXCLUDE_OPTIONS $TMP_TAR_DIRS
+	TAR_EXIT=$?
+	if  [ $TAR_EXIT == 0 ]; then
 		[ -n "$BACKUP_INDEX_FILE" ] && \
-			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "success at" $(date) >> "$BACKUP_INDEX_FILE"
+			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "success at" $(date) >> "$BACKUP_INDEX_FILE" || \
+				exit $?
 		decho "Backup finished"
 	else
 		[ -n "$BACKUP_INDEX_FILE" ] && \
 			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "FAILED." >> "$BACKUP_INDEX_FILE"
 		decho "Backup FAILED!"
+		exit $TAR_EXIT
 	fi
 fi
 #eof
