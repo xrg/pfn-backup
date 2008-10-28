@@ -1,0 +1,18 @@
+--- postgresql.conf.bak	2008-08-08 12:10:18.000000000 +0300
++++ postgresql.conf	2008-10-28 18:05:19.000000000 +0200
+@@ -175,11 +175,11 @@
+ 
+ # - Archiving -
+ 
+-#archive_mode = off		# allows archiving to be done
++archive_mode = on		# allows archiving to be done
+ 				# (change requires restart)
+-#archive_command = ''		# command to use to archive a logfile segment
+-#archive_timeout = 0		# force a logfile segment switch after this
+-				# time; 0 is off
++archive_command = '/usr/lib/pfn_backup/pgsql_archive.sh "%p"'	# command to use to archive a logfile segment
++archive_timeout = 180		# force a logfile segment switch after this
++				# time; 0 is off, 180 = 3min
+ 
+ 
+ #------------------------------------------------------------------------------
