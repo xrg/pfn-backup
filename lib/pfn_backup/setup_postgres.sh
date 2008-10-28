@@ -38,7 +38,7 @@ if ! cat ${PGDATA}/postgresql.conf | parse_pg_conf | grep 'archive_mode = on' ; 
 	if /etc/init.d/${NAME} status > /dev/null  ; then
 		echo 'This script should not be run with postgres running.'
 		echo 'Please, stop the server and try again.'
-	#	exit 3
+		exit 3
 	fi
 	
 	echo "Patching ${PGDATA}/postgresql.conf"
@@ -51,7 +51,5 @@ fi
 
 
 mk_backup_dir
-
-echo "Done!"
 
 #eof

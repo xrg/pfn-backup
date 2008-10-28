@@ -2,8 +2,11 @@
 %define git_head HEAD
 
 %define name pfn-backup
-%define version 0.2
-%define release %mkrel 2
+%define version 0.3
+%define release %mkrel 1
+
+# this will force "/usr/lib/" even on 64-bit
+%define libndir %{_exec_prefix}/lib
 
 Name:		%{name}
 Version:	%{version}
@@ -23,6 +26,9 @@ Pfn-backup is a set of shell (bash) scripts that direct GNU tar into
 making your everyday backups. Backups are stored on some local 
 filesystem, which is then mirrored to any remote media.
 
+Note: in order to setup Postgresql hot-backup (PITR) for the first time,
+you may need to install this package with the Postgres server stopped.
+
 %prep
 %git_get_source
 %setup -q
@@ -40,6 +46,8 @@ install bin/* %{buildroot}%{_bindir}/
 install sbin/* %{buildroot}%{_sbindir}/
 install -d %{buildroot}%{_sysconfdir}/cron.daily
 install -d %{buildroot}/var/backup
+install -d %{buildroot}%{libndir}/pfn_backup/
+install lib/pfn_backup/* %{buildroot}%{libndir}/pfn_backup/
 
 cat '-' >%{buildroot}%{_sysconfdir}/cron.daily/all-backup.sh  <<EOF
 #!/bin/bash
@@ -56,6 +64,12 @@ touch	%{buildroot}/var/backup/index
 
 %post
 %create_ghostfile /var/backup/index root backup 664
+if [ -d "%{_localstatedir}/pgsql" ] ; then
+	if ! %{libndir}/pfn_backup/setup_postgres.sh ; then
+		echo "Cannot automatically setup Postgres for hot backup."
+		echo "Please run %{libndir}/pfn_backup/setup_postgres.sh"
+	fi
+fi
 
 %files
 %defattr(-,root,root)
@@ -63,5 +77,6 @@ touch	%{buildroot}/var/backup/index
 %attr(0755,root,backup)	%{_bindir}/user-backup.sh
 %attr(0755,root,root)	%{_sbindir}/*
 %attr(0744,root,root)	%{_sysconfdir}/cron.daily/all-backup.sh
+			%{libndir}/pfn_backup/*
 %attr(0775,root,backup) %dir /var/backup
 %attr(0664,root,backup) %ghost /var/backup/index
