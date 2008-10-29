@@ -11,8 +11,8 @@
 -#archive_timeout = 0		# force a logfile segment switch after this
 -				# time; 0 is off
 +archive_command = '/usr/lib/pfn_backup/pgsql_archive.sh "%p"'	# command to use to archive a logfile segment
-+archive_timeout = 180		# force a logfile segment switch after this
-+				# time; 0 is off, 180 = 3min
++archive_timeout = 600		# force a logfile segment switch after this
++				# time; 0 is off, 600 = 10min
  
  
  #------------------------------------------------------------------------------
