@@ -18,3 +18,8 @@ BACKUP_INDEX_FILE=/var/backup/index
 TAR_DEFAULT_OPTIONS="-pSP"
 
 BACKUP_DIR=/some-disk/backup/
+
+# BACKUP_USE_GPG=y
+# Specify the GPG key to encrypt the backups with. This key must exist
+# in root's public keyring.
+#BACKUP_GPG_KEY=0x...

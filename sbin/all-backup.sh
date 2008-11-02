@@ -4,7 +4,10 @@
 # by P. Christeas, (c) 2005-6
 # This is free software!
 
+set -e
+
 #defaults:
+BACKUP_NICELEVEL=10
 BACKUP_ALL_TFILE=/etc/backup/all.cfg
 
 . /etc/backup/options || ( echo "Default options not found, exiting" ; exit 1)
@@ -20,23 +23,19 @@ if [ ! -e "$BACKUP_INDEX_FILE" ] ; then
 	chmod ug+w "$BACKUP_INDEX_FILE"
 fi
 
+NICE_CMD=""
+if [ -n "$BACKUP_NICELEVEL" ] ; then
+	NICE_CMD="nice -n $BACKUP_NICELEVEL"
+fi
+
 grep -v '^#' $BACKUP_ALL_TFILE | \
 grep -v '^$' | \
 while read B_USER B_LINE ; do
 	if [ "$B_USER" == 'root' ] ; then
-		$USER_BACKUP $B_LINE $@
+		$NICE_CMD $USER_BACKUP $B_LINE $@
 	else
-		su $B_USER -c "${USER_BACKUP} ${B_LINE} $@"
+		su $B_USER -c "$NICE_CMD ${USER_BACKUP} ${B_LINE} $@"
 	fi
 done
-
-# Quick and dirty set of root's home, so that gpg works
-if [ -z $HOME ] ; then
-	export HOME=/root
-fi
-for FILE in $BACKUP_DIR/*.gz ; do 
-	gpg -o $BACKUP_DIR/gpg/$(basename $FILE) -r 'my_key' -e $FILE && \
-       		rm $FILE
-done 
 
 #eof
