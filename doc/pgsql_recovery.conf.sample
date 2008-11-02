@@ -1,0 +1,3 @@
+# please revise the path:
+
+restore_command = '/usr/lib/pfn_backup/pgsql_restore.sh "%f" "%p"'
