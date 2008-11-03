@@ -94,7 +94,7 @@ fi
 
 if [ ! -n "$TAR_FILE_BASE" ] ; then
 	if [ -n "$BACKUP_DIR" ] ; then
-	TAR_FILE_BASE="$BACKUP_DIR/backup-$FCODE"
+	TAR_FILE_BASE="$BACKUP_DIR/incoming/backup-$FCODE"
 	else
 	TAR_FILE_BASE="/tmp/backup"
 	fi
