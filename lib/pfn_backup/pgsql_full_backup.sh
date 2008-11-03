@@ -39,6 +39,7 @@ $PSQL -c "SELECT pg_stop_backup();"
 sleep 20
 tar -rvf ${TAR_FILE} ${BACKUP_DIR}/pgsql/wals
 gzip ${TAR_FILE}
+mv ${TAR_FILE}.gz "$BACKUP_DIR/incoming"
 
 # do that as quicly (atomic) as possible. Still, the pgsql_archive.sh will
 # tolerate a missing wals/ 
