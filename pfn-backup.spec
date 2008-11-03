@@ -49,9 +49,12 @@ install -d %{buildroot}/var/backup
 install -d %{buildroot}%{libndir}/pfn_backup/
 install lib/pfn_backup/* %{buildroot}%{libndir}/pfn_backup/
 
-cat '-' >%{buildroot}%{_sysconfdir}/cron.daily/all-backup.sh  <<EOF
+cat '-' >%{buildroot}%{_sysconfdir}/cron.daily/multistage-backup.sh  <<EOF
 #!/bin/bash
-nice %{_sbindir}/all-backup.sh
+set -e
+%{_sbindir}/all-backup.sh
+%{_sbindir}/backup-encrypt.sh
+
 EOF
 
 touch	%{buildroot}/var/backup/index
@@ -75,8 +78,9 @@ fi
 %defattr(-,root,root)
 %config(noreplace)	%{_sysconfdir}/backup/*
 %attr(0755,root,backup)	%{_bindir}/user-backup.sh
+%attr(0755,root,backup)	%{_bindir}/prepare-media.sh
 %attr(0755,root,root)	%{_sbindir}/*
-%attr(0744,root,root)	%{_sysconfdir}/cron.daily/all-backup.sh
+%attr(0744,root,root)	%{_sysconfdir}/cron.daily/multistage-backup.sh
 			%{libndir}/pfn_backup/*
 %attr(0775,root,backup) %dir /var/backup
 %attr(0664,root,backup) %ghost /var/backup/index
