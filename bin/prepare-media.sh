@@ -60,6 +60,24 @@ fi
 MEDIA_NAME[$LAST_MEDIA]=${MEDIA_BASE_NAME}$(( ${LAST_MEDIA} + 1))
 let MEDIA_SIZE[$LAST_MEDIA]=$DISK_SIZE
 
+while [ -d "$BK_MEDIA_DIR/${MEDIA_NAME[$LAST_MEDIA]}" ] ; do
+		#using the full path for 'du', to avoid aliases
+	TMP_SIZE=$(/usr/bin/du -k -s "$BK_MEDIA_DIR/${MEDIA_NAME[$LAST_MEDIA]}" | cut -f 1)
+	
+	if [ $TMP_SIZE -gt $DISK_SIZE ] ; then
+		MEDIA_SIZE[$LAST_MEDIA]=0
+	else
+		MEDIA_SIZE[$LAST_MEDIA]=$(($DISK_SIZE-$TMP_SIZE))
+	fi
+	
+	echo "Located media: ${MEDIA_NAME[$LAST_MEDIA]}, disk- $TMP_SIZE = ${MEDIA_SIZE[$LAST_MEDIA]}"
+	
+	LAST_MEDIA=$(($LAST_MEDIA +1))
+	
+	MEDIA_NAME[$LAST_MEDIA]=${MEDIA_BASE_NAME}$(( ${LAST_MEDIA} + 1))
+	let MEDIA_SIZE[$LAST_MEDIA]=$DISK_SIZE
+done
+
 pushd "$BK_DIR"
 for FIL in $BK_PAT ; do
 	if [ ! -f "$FIL" ] ; then
@@ -73,7 +91,7 @@ for FIL in $BK_PAT ; do
 	else
 		let CUR_MEDIA=$FIRST_MEDIA
 		while [ $SIZ -gt ${MEDIA_SIZE[$CUR_MEDIA]} ] ; do
-			if [ $CUR_MEDIA == $FIRST_MEDIA ] && [ ${MEDIA_SIZE[$CUR_MEDIA]} -lt $CLOSE_SIZE ]; then
+			if [ $CUR_MEDIA == $FIRST_MEDIA ] && [ ${MEDIA_SIZE[$CUR_MEDIA]} -lt $CLOSE_SIZE ] ; then
 				#don't visit this media again
 				let FIRST_MEDIA+=1
 			fi
