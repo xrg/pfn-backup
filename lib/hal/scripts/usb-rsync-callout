@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# File: /usr/lib/hal/usb-rsync-callout
+#
+# Author: Jimmy Angelakos
+# based on work done by Wayne D at http://wdawe.com
+#
+# This is the HAL callout, which, as it has very little time to run,
+# has to call another script to do the actual rsync.
+
+#       logger $HALD_ACTION
+        case $HALD_ACTION in
+          add)
+# May be unnecessary, experiment
+            sleep 1
+            logger "usb-rsync: USB backup key inserted"
+            /usr/lib/pfn_backup/rsync_removable.sh &
+            ;;
+
+          remove)
+            logger "usb-rsync: USB backup key removed"
+            ;;
+        esac

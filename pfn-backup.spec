@@ -2,7 +2,7 @@
 %define git_head HEAD
 
 %define name pfn-backup
-%define version 0.3
+%define version 0.4
 %define release %mkrel 1
 
 # this will force "/usr/lib/" even on 64-bit
@@ -48,6 +48,8 @@ install -d %{buildroot}%{_sysconfdir}/cron.daily
 install -d %{buildroot}/var/backup
 install -d %{buildroot}%{libndir}/pfn_backup/
 install lib/pfn_backup/* %{buildroot}%{libndir}/pfn_backup/
+install -d %{buildroot}%{libndir}/hal/scripts/
+install lib/hal/scripts/* %{buildroot}%{libndir}/hal/scripts/
 
 cat '-' >%{buildroot}%{_sysconfdir}/cron.daily/multistage-backup.sh  <<EOF
 #!/bin/bash
@@ -82,5 +84,6 @@ fi
 %attr(0755,root,root)	%{_sbindir}/*
 %attr(0744,root,root)	%{_sysconfdir}/cron.daily/multistage-backup.sh
 			%{libndir}/pfn_backup/*
+%attr(0755,root,root)	%{libndir}/hal/scripts/usb-rsync-callout
 %attr(0775,root,backup) %dir /var/backup
 %attr(0664,root,backup) %ghost /var/backup/index
