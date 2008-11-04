@@ -5,6 +5,8 @@
 # This is free software.
 #
 
+# Note, this may be Postgres 8.3 specific.
+
 # exit on any non-handled error
 set -e
 
@@ -45,7 +47,7 @@ if ! cat ${PGDATA}/postgresql.conf | parse_pg_conf | grep 'archive_mode = on' ; 
 
 	cp -a ${PGDATA}/postgresql.conf ${PGDATA}/postgresql.conf.bak
 	
-	patch -p 1 -l ${PGDATA}/postgresql.conf ${PFN_SHDIR}/postgres.conf.patch
+	su postgres -c "patch -p 1 -l ${PGDATA}/postgresql.conf ${PFN_SHDIR}/postgres.conf.patch"
 	
 fi
 
