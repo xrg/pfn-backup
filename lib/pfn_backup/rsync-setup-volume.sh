@@ -4,7 +4,7 @@
 # This is free software.
 #
 LIST_MOUNTED=0
-LIST_REMOVABLE=1
+LIST_REMOVABLE=0
 VERBOSE=
 OUTFILE=20-usb-rsync.fdi
 
@@ -20,7 +20,7 @@ echo "---------------"
 hal-find-by-capability --capability 'volume' | \
 while read UDI ; do
 	vecho "Processing volume $UDI"
-	if [ $(hal-get-property --udi $UDI --key 'volume.fsusage') != 'filesystem' ] ; then
+	if [ "$(hal-get-property --udi $UDI --key 'volume.fsusage')" != 'filesystem' ] ; then
 		vecho "Volume is not filesystem"
 		continue
 	fi
