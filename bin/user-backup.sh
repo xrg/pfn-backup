@@ -163,6 +163,10 @@ if [ -n "$TMP_NEWER" ] ; then
 			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "success at" $(date) >> "$BACKUP_INDEX_FILE" || \
 				exit $?
 		decho "Backup finished"
+	elif [ $TAR_EXIT == 1 ] ; then
+		# it is a non-fatal tar exit
+		[ -n "$BACKUP_INDEX_FILE" ] && \
+			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "success at" $(date) " with warnings." >> "$BACKUP_INDEX_FILE"
 	else
 		[ -n "$BACKUP_INDEX_FILE" ] && \
 			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "FAILED." >> "$BACKUP_INDEX_FILE"
@@ -179,6 +183,10 @@ else
 			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "success at" $(date) >> "$BACKUP_INDEX_FILE" || \
 				exit $?
 		decho "Backup finished"
+	elif [ $TAR_EXIT == 1 ] ; then
+		# it is a non-fatal tar exit
+		[ -n "$BACKUP_INDEX_FILE" ] && \
+			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "success at" $(date) " with warnings." >> "$BACKUP_INDEX_FILE"
 	else
 		[ -n "$BACKUP_INDEX_FILE" ] && \
 			echo "$TSTAMP" $TMP_TAR_FILE $TMP_CODE "FAILED." >> "$BACKUP_INDEX_FILE"

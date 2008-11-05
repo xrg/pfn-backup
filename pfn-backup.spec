@@ -2,7 +2,7 @@
 %define git_head HEAD
 
 %define name pfn-backup
-%define version 0.4
+%define version 0.5
 %define release %mkrel 1
 
 # this will force "/usr/lib/" even on 64-bit
@@ -82,7 +82,7 @@ fi
 %attr(0755,root,backup)	%{_bindir}/user-backup.sh
 %attr(0755,root,backup)	%{_bindir}/prepare-media.sh
 %attr(0755,root,root)	%{_sbindir}/*
-%attr(0744,root,root)	%{_sysconfdir}/cron.daily/multistage-backup.sh
+%attr(0755,root,root)	%{_sysconfdir}/cron.daily/multistage-backup.sh
 			%{libndir}/pfn_backup/*
 %attr(0755,root,root)	%{libndir}/hal/scripts/usb-rsync-callout
 %attr(0775,root,backup) %dir /var/backup

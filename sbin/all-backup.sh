@@ -12,10 +12,10 @@ BACKUP_ALL_TFILE=/etc/backup/all.cfg
 
 . /etc/backup/options || ( echo "Default options not found, exiting" ; exit 1)
 
-if [ ! -d $BACKUP_DIR ] ; then
-	mkdir -p "$BACKUP_DIR"
-	[ -n "$BACKUP_GROUP" ] && chgrp "$BACKUP_GROUP" "$BACKUP_DIR"
-	chmod ug+w "$BACKUP_DIR"
+if [ ! -d $BACKUP_DIR/incoming ] ; then
+	mkdir -p "$BACKUP_DIR/incoming"
+	[ -n "$BACKUP_GROUP" ] && chgrp "$BACKUP_GROUP" "$BACKUP_DIR/incoming"
+	chmod ug+w "$BACKUP_DIR/incoming"
 fi
 if [ ! -e "$BACKUP_INDEX_FILE" ] ; then
 	echo > "$BACKUP_INDEX_FILE"
@@ -28,14 +28,30 @@ if [ -n "$BACKUP_NICELEVEL" ] ; then
 	NICE_CMD="nice -n $BACKUP_NICELEVEL"
 fi
 
+GT_EXIT=0
+
 grep -v '^#' $BACKUP_ALL_TFILE | \
 grep -v '^$' | \
 while read B_USER B_LINE ; do
 	if [ "$B_USER" == 'root' ] ; then
-		$NICE_CMD $USER_BACKUP $B_LINE $@
+		if ! $NICE_CMD $USER_BACKUP $B_LINE $@ ; then
+			EXIT_CODE=$?
+			echo "Exit code: $EXIT_CODE from line $B_LINE."
+			if [ "$GT_EXIT" -lt "$EXIT_CODE" ] ; then
+				GT_EXIT=$EXIT_CODE
+			fi
+		fi
 	else
-		su $B_USER -c "$NICE_CMD ${USER_BACKUP} ${B_LINE} $@"
+		if ! su $B_USER -c "$NICE_CMD ${USER_BACKUP} ${B_LINE} $@" ; then
+			EXIT_CODE=$?
+			echo "Exit code: $EXIT_CODE from user $B_USER."
+			if [ "$GT_EXIT" -lt "$EXIT_CODE" ] ; then
+				GT_EXIT=$EXIT_CODE
+			fi
+		fi
 	fi
 done
+
+exit "$GT_EXIT"
 
 #eof
