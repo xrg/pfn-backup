@@ -34,16 +34,18 @@ grep -v '^#' $BACKUP_ALL_TFILE | \
 grep -v '^$' | \
 while read B_USER B_LINE ; do
 	if [ "$B_USER" == 'root' ] ; then
-		if ! $NICE_CMD $USER_BACKUP $B_LINE $@ ; then
-			EXIT_CODE=$?
+		EXIT_CODE=0
+		$NICE_CMD $USER_BACKUP $B_LINE $@ || EXIT_CODE=$?
+		if [ "$EXIT_CODE" != 0 ]  ; then
 			echo "Exit code: $EXIT_CODE from line $B_LINE."
 			if [ "$GT_EXIT" -lt "$EXIT_CODE" ] ; then
 				GT_EXIT=$EXIT_CODE
 			fi
 		fi
 	else
-		if ! su $B_USER -c "$NICE_CMD ${USER_BACKUP} ${B_LINE} $@" ; then
-			EXIT_CODE=$?
+		EXIT_CODE=0
+		su $B_USER -c "$NICE_CMD ${USER_BACKUP} ${B_LINE} $@" || EXIT_CODE=$?
+		if [ "$EXIT_CODE" != 0 ]  ; then
 			echo "Exit code: $EXIT_CODE from user $B_USER."
 			if [ "$GT_EXIT" -lt "$EXIT_CODE" ] ; then
 				GT_EXIT=$EXIT_CODE
