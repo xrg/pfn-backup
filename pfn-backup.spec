@@ -2,7 +2,7 @@
 %define git_head HEAD
 
 %define name pfn-backup
-%define version 0.5
+%define version 0.5.2
 %define release %mkrel 1
 
 # this will force "/usr/lib/" even on 64-bit
