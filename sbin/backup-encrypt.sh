@@ -8,6 +8,11 @@ set -e
 GPG_BIN=/usr/bin/gpg
 GPG_CMD="nice -n 10 $GPG_BIN"
 
+# run-parts from crond sets the HOME as /
+if [ "$HOME" == "/" ] ; then
+	export HOME=/root
+fi
+
 . /etc/backup/options || ( echo "Default options not found, exiting" ; exit 1)
 
 if [ "x$BACKUP_USE_GPG" != "xy" ] ; then
