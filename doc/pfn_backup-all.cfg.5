@@ -1,0 +1,34 @@
+.TH pfn_backup-all.cfg 8 "2009-02-01" Pfn\ Backup
+.SH NAME 
+all.cfg \(em List of sections/users to backup
+
+.SH DESCRIPTION 
+This file contains the sections and users to be backed up in a daily
+backup using the Pfn_backup system.
+
+Each line is in the form of:
+     \fIuser\fP  options ...
+     
+where the \fIuser\fP is a username or root and \fIoptions\fP are arguments
+passed to user-backup.sh(1). Note that the last options may contain paths
+to be backed up.
+
+Lines beginning with a hash # are treated as comments.
+
+.SH EXAMPLE
+  # Some comment
+  root	--config var --config /etc/backup/config-var /var
+
+  #normal users should normally not need any option..
+  joeuser
+  
+
+.SH SEE ALSO 
+pfn_backup-options(5), user-backup.sh(1)
+
+.SH AUTHOR 
+
+This manual page was written by Panos Christeas <p_christ@hol.gr>
+Permission is granted to copy, distribute and/or modify this document under 
+the terms of the GNU General Public License, Version 2 any  
+later version published by the Free Software Foundation. 

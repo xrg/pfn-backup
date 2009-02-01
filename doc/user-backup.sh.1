@@ -1,0 +1,72 @@
+.TH user-backup.sh 8 "2009-02-01" Pfn\ Backup
+.SH NAME 
+user-backup.sh \(em Perform a backup for the current user
+.SH SYNOPSIS 
+.B user-backup.sh [-v] [--config \fI<CFG_FILE>\fB] [--dry-run]
+.B [--full] [--code \fI<code>\fB] [--fcode \fI<fcode>\fB]
+.B [\fI<dir>\fP ...\fB]
+
+.SH DESCRIPTION 
+.B user-backup.sh
+Backups the data for a user. It looks in the index file for a previous 
+successful backup and, if it finds one, operates in incremental mode. 
+Otherwise it takes a full backup.
+
+It uses all options specified to start a \fItar\fP on the user's home or
+the specified path(s).
+
+.SH OPTIONS
+.B -v
+Verbose output
+
+.B --config \fI<CFG_FILE>
+Use an alternative configuration file.
+
+.B --dry-run
+Do not perform backup, only show actions.
+
+.B --full
+Force a full backup.
+
+.B --code | --fcode \fI<code>
+Mark the backup as backup-xx-\fI<code>\fP.tar.gz . 
+.BR
+By default, the username will be the code.
+
+.B <dir> ...
+Directories to backup. By default $HOME is backed up.
+
+.SH EXAMPLE
+  $ user.backup.sh -v
+  
+  This will a backup of the user's data
+
+.SH FILES
+.B /etc/backup/options
+Generic backup options.
+
+.B ~/.backupoptions
+User-defined options.
+
+.B $BACKUP_DIR/incoming/
+Directory placing the first-stage backups, must be user-writable
+
+.B $BACKUP_INDEX_FILE
+Index file, holding the backup result date/state. Must be writable
+by all backup users. If reset, next backup will be a full one.
+Default:
+.I /var/backup/index
+
+.BUGS
+In incremental mode, files that have changed since the start of the previous
+backup are considered changed. This may not be perfectly accurate.
+
+.SH SEE ALSO 
+pfn_backup-all.cfg(5), pfn_backup-options(5), all-backup.sh(8), tar(1)
+
+.SH AUTHOR 
+
+This manual page was written by Panos Christeas <p_christ@hol.gr>
+Permission is granted to copy, distribute and/or modify this document under 
+the terms of the GNU General Public License, Version 2 any  
+later version published by the Free Software Foundation. 
