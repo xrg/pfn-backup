@@ -51,6 +51,15 @@ install lib/pfn_backup/* %{buildroot}%{libndir}/pfn_backup/
 install -d %{buildroot}%{libndir}/hal/scripts/
 install lib/hal/scripts/* %{buildroot}%{libndir}/hal/scripts/
 
+#install the man pages
+for MLEVEL in 1 5 8 ; do
+	install -d %{buildroot}%{_mandir}/man$MLEVEL
+	install  doc/*.$MLEVEL %{buildroot}%{_mandir}/man$MLEVEL/
+	pushd %{buildroot}%{_mandir}/man$MLEVEL/
+		lzma *.$MLEVEL
+	popd
+done
+
 cat '-' >%{buildroot}%{_sysconfdir}/cron.daily/multistage-backup.sh  <<EOF
 #!/bin/bash
 set -e
@@ -87,3 +96,6 @@ fi
 %attr(0755,root,root)	%{libndir}/hal/scripts/usb-rsync-callout
 %attr(0775,root,backup) %dir /var/backup
 %attr(0664,root,backup) %ghost /var/backup/index
+			%{_mandir}/man1/*.1*
+			%{_mandir}/man5/*.5*
+			%{_mandir}/man8/*.8*
