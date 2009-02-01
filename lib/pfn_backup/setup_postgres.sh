@@ -17,11 +17,16 @@ parse_pg_conf() {
 
 mk_backup_dir() {
 	. /etc/backup/options
-	[ ! -d ${BACKUP_DIR}/pgsql/wals ] || \
+	[ -d ${BACKUP_DIR}/pgsql/wals ] || \
 		mkdir -p ${BACKUP_DIR}/pgsql/wals
 	chown postgres ${BACKUP_DIR}/pgsql ${BACKUP_DIR}/pgsql/wals
 	chmod -R o-rwx ${BACKUP_DIR}/pgsql
 }
+
+if [ "$1" == "-f" ] ; then
+	FORCE=y
+	shift 1
+fi
 
 PGDATA=/var/lib/pgsql/data
 LOGFILE=/var/log/postgres/postgresql
@@ -37,7 +42,7 @@ PFN_SHDIR=$(dirname $0)
 
 if ! cat ${PGDATA}/postgresql.conf | parse_pg_conf | grep 'archive_mode = on' ; then
 
-	if /etc/init.d/${NAME} status > /dev/null  ; then
+	if [ "$FORCE" != "y" ] && /etc/init.d/${NAME} status > /dev/null  ; then
 		echo 'This script should not be run with postgres running.'
 		echo 'Please, stop the server and try again.'
 		exit 3
@@ -47,7 +52,7 @@ if ! cat ${PGDATA}/postgresql.conf | parse_pg_conf | grep 'archive_mode = on' ; 
 
 	cp -a ${PGDATA}/postgresql.conf ${PGDATA}/postgresql.conf.bak
 	
-	su postgres -c "patch -p 1 -l ${PGDATA}/postgresql.conf ${PFN_SHDIR}/postgres.conf.patch"
+	su - postgres -c "patch -p 1 -l ${PGDATA}/postgresql.conf ${PFN_SHDIR}/postgres.conf.patch"
 	
 fi
 
