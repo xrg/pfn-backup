@@ -46,6 +46,7 @@ install -D etc/backup/* %{buildroot}%{_sysconfdir}/backup/
 install bin/* %{buildroot}%{_bindir}/
 install sbin/* %{buildroot}%{_sbindir}/
 install -d %{buildroot}%{_sysconfdir}/cron.daily
+install -d %{buildroot}%{_sysconfdir}/cron.monthly
 install -d %{buildroot}/var/backup
 install -d %{buildroot}%{libndir}/pfn_backup/
 install lib/pfn_backup/* %{buildroot}%{libndir}/pfn_backup/
@@ -66,6 +67,12 @@ cat '-' >%{buildroot}%{_sysconfdir}/cron.daily/multistage-backup.sh  <<EOF
 set -e
 %{_sbindir}/all-backup.sh
 %{_sbindir}/backup-encrypt.sh
+
+EOF
+
+cat '-' >%{buildroot}%{_sysconfdir}/cron.monthly/pfn-full-backup  <<EOF
+#!/bin/bash
+%{_sbindir}/full-backup-trigger.sh
 
 EOF
 
@@ -92,7 +99,8 @@ fi
 %attr(0755,root,backup)	%{_bindir}/user-backup.sh
 %attr(0755,root,backup)	%{_bindir}/prepare-media.sh
 %attr(0755,root,root)	%{_sbindir}/*
-%attr(0755,root,root)	%{_sysconfdir}/cron.daily/multistage-backup.sh
+%attr(0755,root,root)	%config(noreplace) %{_sysconfdir}/cron.daily/multistage-backup.sh
+%attr(0755,root,root)	%config(noreplace) %{_sysconfdir}/cron.monthly/pfn-full-backup
 			%{libndir}/pfn_backup/*
 %attr(0755,root,root)	%{libndir}/hal/scripts/usb-rsync-callout
 %attr(0775,root,backup) %dir /var/backup
