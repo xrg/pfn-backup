@@ -9,6 +9,7 @@ set -e
 #defaults:
 BACKUP_NICELEVEL=10
 BACKUP_ALL_TFILE=/etc/backup/all.cfg
+BACKUP_POSTGRES_FULL_SH=/usr/lib/pfn_backup/pgsql_full_backup.sh
 
 . /etc/backup/options || ( echo "Default options not found, exiting" ; exit 1)
 
@@ -29,6 +30,19 @@ if [ -n "$BACKUP_NICELEVEL" ] ; then
 fi
 
 GT_EXIT=0
+
+if tail -n 3 "$BACKUP_INDEX_FILE" | grep "^Need full postgres backup" > /dev/null ; then
+	$BACKUP_POSTGRES_FULL_SH || EXIT_CODE=$?
+	if [ "$EXIT_CODE" != 0 ]  ; then
+		echo $BACKUP_POSTGRES_FULL_SH
+		echo "Exit code: $EXIT_CODE for full Postgres backup."
+		if [ "$GT_EXIT" -lt "$EXIT_CODE" ] ; then
+			GT_EXIT=$EXIT_CODE
+		fi
+	fi
+fi
+
+exit 0
 
 grep -v '^#' $BACKUP_ALL_TFILE | \
 grep -v '^$' | \
