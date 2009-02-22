@@ -44,7 +44,7 @@ while read B_USER B_LINE ; do
 		fi
 	else
 		EXIT_CODE=0
-		su $B_USER -c "$NICE_CMD ${USER_BACKUP} ${B_LINE} $@" || EXIT_CODE=$?
+		su $B_USER -s /bin/bash -c "$NICE_CMD ${USER_BACKUP} ${B_LINE} $@" || EXIT_CODE=$?
 		if [ "$EXIT_CODE" != 0 ]  ; then
 			echo "Exit code: $EXIT_CODE from user $B_USER."
 			if [ "$GT_EXIT" -lt "$EXIT_CODE" ] ; then
