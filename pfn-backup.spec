@@ -2,8 +2,8 @@
 %define git_head HEAD
 
 %define name pfn-backup
-%define version 0.5.3
-%define release %mkrel 1
+%define version %git_get_ver
+%define release %mkrel %git_get_rel
 
 # this will force "/usr/lib/" even on 64-bit
 %define libndir %{_exec_prefix}/lib
@@ -32,6 +32,7 @@ you may need to install this package with the Postgres server stopped.
 %prep
 %git_get_source
 %setup -q
+%git_gen_changelog
 
 %build
 # nothing to build!
@@ -99,3 +100,6 @@ fi
 			%{_mandir}/man1/*.1*
 			%{_mandir}/man5/*.5*
 			%{_mandir}/man8/*.8*
+
+%changelog -f Changelog.git.txt
+
