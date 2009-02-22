@@ -14,6 +14,12 @@ file (see. pfn_backup-all.cfg(5) )
   
   This will start the backup.
   
+.SH NOTE
+If the backup index contains a line like "Need full postgress backup", among its
+last 3 lines, then 
+.B all-backup.sh
+will also perform a full, warm, backup of postgresql server, using the PITR method.
+
 .SH SEE ALSO 
 pfn_backup-all.cfg(5), pfn_backup-options(5), user-backup.sh(1)
 

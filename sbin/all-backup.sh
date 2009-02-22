@@ -42,8 +42,6 @@ if tail -n 3 "$BACKUP_INDEX_FILE" | grep "^Need full postgres backup" > /dev/nul
 	fi
 fi
 
-exit 0
-
 grep -v '^#' $BACKUP_ALL_TFILE | \
 grep -v '^$' | \
 while read B_USER B_LINE ; do
