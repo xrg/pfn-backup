@@ -32,6 +32,7 @@ fi
 GT_EXIT=0
 
 if tail -n 3 "$BACKUP_INDEX_FILE" | grep "^Need full postgres backup" > /dev/null ; then
+	EXIT_CODE=0
 	$BACKUP_POSTGRES_FULL_SH || EXIT_CODE=$?
 	if [ "$EXIT_CODE" != 0 ]  ; then
 		echo $BACKUP_POSTGRES_FULL_SH
