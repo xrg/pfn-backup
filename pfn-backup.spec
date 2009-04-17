@@ -13,7 +13,7 @@ Version:	%{version}
 Release:	%{release}
 Summary:	Pefnos Backup scripts
 Group:		Archiving/
-BuildArch:	noarch
+# BuildArch:	noarch
 License:	GPL
 Source0:	pfn-backup-%{version}.tar.gz
 
@@ -50,8 +50,8 @@ install -d %{buildroot}%{_sysconfdir}/cron.monthly
 install -d %{buildroot}/var/backup
 install -d %{buildroot}%{libndir}/pfn_backup/
 install lib/pfn_backup/* %{buildroot}%{libndir}/pfn_backup/
-install -d %{buildroot}%{libndir}/hal/scripts/
-install lib/hal/scripts/* %{buildroot}%{libndir}/hal/scripts/
+install -d %{buildroot}%{_libdir}/hal/scripts/
+install lib/hal/scripts/* %{buildroot}%{_libdir}/hal/scripts/
 
 #install the man pages
 for MLEVEL in 1 5 8 ; do
@@ -102,7 +102,7 @@ fi
 %attr(0755,root,root)	%config(noreplace) %{_sysconfdir}/cron.daily/multistage-backup.sh
 %attr(0755,root,root)	%config(noreplace) %{_sysconfdir}/cron.monthly/pfn-full-backup
 			%{libndir}/pfn_backup/*
-%attr(0755,root,root)	%{libndir}/hal/scripts/usb-rsync-callout
+%attr(0755,root,root)	%{_libdir}/hal/scripts/usb-rsync-callout
 %attr(0775,root,backup) %dir /var/backup
 %attr(0664,root,backup) %ghost /var/backup/index
 			%{_mandir}/man1/*.1*
