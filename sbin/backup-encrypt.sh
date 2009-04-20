@@ -26,15 +26,33 @@ fi
 
 [ -d $BACKUP_DIR/gpg ] || mkdir "$BACKUP_DIR/gpg"
 
+encrypt_file() {
+	BASEFILE=$(basename "$1" .gz)
+	
+	OUTFILE="$BACKUP_DIR/gpg/$BASEFILE.gpg"
+	TMCOUNT=1
+	while [ -e "$OUTFILE" ] ; do
+		if [ $TMCOUNT -gt 9 ] ; then
+			echo "File $BASEFILE is encrypted $TMCOUNT files already." >&2
+			return 1
+		fi
+		OUTFILE="$BACKUP_DIR/gpg/$BASEFILE-$TMCOUNT.gpg"
+		TMCOUNT=$(expr $TMCOUNT '+' 1)
+	done
+	
+	$GPG_CMD -o "$OUTFILE" -r ${BACKUP_GPG_KEY} -e "$1" && \
+		rm -f "$1"
+}
+
 for FILE in $BACKUP_DIR/incoming/*.gz ; do
-	$GPG_CMD -o $BACKUP_DIR/gpg/$(basename $FILE).gpg -r ${BACKUP_GPG_KEY} -e $FILE && \
-		rm $FILE
+	# if no incoming file, next check will fail
+	[ ! -f "$FILE" ] && continue
+	encrypt_file "$FILE"
 done
 
 if [ -d ${BACKUP_DIR}/pgsql/wals ] ; then
 	for FILE in $BACKUP_DIR/pgsql/wals/* ; do
-		$GPG_CMD -o $BACKUP_DIR/gpg/$(basename $FILE).gpg -r ${BACKUP_GPG_KEY} -e $FILE && \
-			rm $FILE
+		encrypt_file "$FILE"
 	done
 fi
 
