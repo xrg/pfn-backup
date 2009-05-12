@@ -73,20 +73,31 @@ $BEEP_CMD -f 1000 -n -f 10 -l 50 -n -f 2000 -n -d 10 -l 100
 
 BEEP_CMD2="$BEEP_CMD -s -f 400 -D 20 -l 10"
 
+function perform_backup() {
 if [ -f $MNTPOINT/signature ] && cmp /root/signature $MNTPOINT/signature ; then
 	echo "Performing backup!" | $OUT
-	[ "$DO_VERBOSE" == 'y' ] && (echo "rsync a $RSYNC_OPTS -P -q $BKUP_SRC $MNTPOINT/$BKUP_DEST" | $OUT )
-	nice -n 10 rsync -a $RSYNC_OPTS -P -q "$BKUP_SRC" "$MNTPOINT/$BKUP_DEST" | $BEEP_CMD2 2| $OUT
-	umount $MNTPOINT | $OUT
-	echo "Sync done,USB can be removed." | $OUT
+	[ "$DO_VERBOSE" == 'y' ] && (echo "rsync a $RSYNC_OPTS -P -q $BKUP_SRC $MNTPOINT/$BKUP_DEST" )
+	export RES=0
+	rsync -a $RSYNC_OPTS -P -q "$BKUP_SRC" "$MNTPOINT/$BKUP_DEST" || RES=$?
+	if [ $RES != 0 ] ; then
+		echo "Backup FAILED with code $RES !"
+		umount $MNTPOINT || true
+		$BEEP_CMD -f 600 -n -d 50 -l 200 -f 400 -n -f 200 -l 500
+		exit $RES
+	fi
+	#
+	umount $MNTPOINT
+	echo "Sync done,USB can be removed."
 	$BEEP_CMD -f 2000 -n -f 10 -l 50 -n -f 1000
 else
 	sleep 1
-	echo "Signature not found! Disk may be spoofed!" | $OUT
-	umount $MNTPOINT | $OUT || true
+	echo "Signature not found! Disk may be spoofed!"
+	umount $MNTPOINT || true
 	$BEEP_CMD -f 200 -l 500
 	exit 2
 fi
+}
 
+perform_backup | $BEEP_CMD2 2| $OUT
 #eof
 
