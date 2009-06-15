@@ -11,22 +11,24 @@ file_size() {
 }
 
 put_large() {
-	#echo "Large:" $1
+	echo "Large:" $1
+	DDIR=$(dirname "$(echo $1 | sed 's|^[^/]*/||')")
 	if [ ! -d "$BK_LARGE_DIR" ] ; then
 		mkdir -p "$BK_LARGE_DIR" || exit 2
 	fi
-	mv "$1" "$BK_LARGE_DIR"/ || return $?
+	$DRY mv "$1" "$BK_LARGE_DIR/$DDIR"/ || return $?
 }
 
 put_media() {
 	local SIZ=$3
 	# echo "Media \"${MEDIA_NAME[$1]}\" += $2, $3, ${MEDIA_SIZE[$1]}"
 	
-	DEST_DIR="$BK_MEDIA_DIR/${MEDIA_NAME[$1]}"
+	DDIR=$(dirname "$(echo $2 | sed 's|^[^/]*/||')")
+	DEST_DIR="$BK_MEDIA_DIR/${MEDIA_NAME[$1]}/$DDIR"
 	if [ ! -d "$DEST_DIR" ] ; then
-		mkdir -p "$DEST_DIR" || exit 2
+		$DRY mkdir -p "$DEST_DIR" || exit 2
 	fi
-	mv "$2" "$DEST_DIR/" || return $?
+	$DRY mv "$2" "$DEST_DIR/" || return $?
 	
 	MEDIA_SIZE[$1]=$((${MEDIA_SIZE[$1]} - $SIZ ))
 }
@@ -54,11 +56,18 @@ BK_PAT="*.gz"
 
 if [ "x$BACKUP_USE_GPG" == "xy" ] ; then
 	BK_DIR="$BACKUP_DIR/gpg"
-	BK_PAT="*.gpg"
+fi
+
+if [ -z "$PREPARE_MEDIA_LINE" ] ; then
+	PREPARE_MEDIA_LINE="find $BK_DIR -type f"
 fi
 
 MEDIA_NAME[$LAST_MEDIA]=${MEDIA_BASE_NAME}$(( ${LAST_MEDIA} + 1))
 let MEDIA_SIZE[$LAST_MEDIA]=$DISK_SIZE
+
+if [ "$1" == '--dry-run' ] ; then
+   DRY="echo"
+fi
 
 while [ -d "$BK_MEDIA_DIR/${MEDIA_NAME[$LAST_MEDIA]}" ] ; do
 		#using the full path for 'du', to avoid aliases
@@ -78,8 +87,8 @@ while [ -d "$BK_MEDIA_DIR/${MEDIA_NAME[$LAST_MEDIA]}" ] ; do
 	let MEDIA_SIZE[$LAST_MEDIA]=$DISK_SIZE
 done
 
-pushd "$BK_DIR"
-for FIL in $BK_PAT ; do
+pushd "$BACKUP_DIR"
+for FIL in $($PREPARE_MEDIA_LINE) ; do
 	if [ ! -f "$FIL" ] ; then
 		continue
 	fi
