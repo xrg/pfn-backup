@@ -102,7 +102,7 @@ fi
 
 TMP_NEWER=""
 
-if [ "$FULL_BACKUP" == "y" ] || ! BKUP_LASTDATE=$(get_lastdate "$BACKUP_INDEX_FILE" "$TMP_CODE") || [ ! -n "$BKUP_LASTDATE" ]
+if [ "$FULL_BKUP" == "y" ] || ! BKUP_LASTDATE=$(get_lastdate "$BACKUP_INDEX_FILE" "$TMP_CODE") || [ ! -n "$BKUP_LASTDATE" ]
 then
 	TMP_TAR_FILE="${TAR_FILE_BASE}-full-$DSTAMP"
 else
