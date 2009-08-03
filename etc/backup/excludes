@@ -22,3 +22,10 @@ mp3
 tmp
 .xauth
 .xsession-errors
+.local/share/Trash
+.kde4/share/apps/amarok/albumcovers/cache
+.kde4/share/apps/ksplash/cache
+.kde4/share/apps/nsplugins/cache
+.java/deployment/cache
+.java/.deployment/javaws/cache
+.lyx/cache
