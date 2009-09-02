@@ -23,7 +23,7 @@ put_media() {
 	local SIZ=$3
 	# echo "Media \"${MEDIA_NAME[$1]}\" += $2, $3, ${MEDIA_SIZE[$1]}"
 	
-	DDIR=$(dirname "$(echo $2 | sed 's|^[^/]*/||')")
+	DDIR=$(dirname "$(echo $2 | sed 's|^[^/]*/||;s/gpg//')")
 	DEST_DIR="$BK_MEDIA_DIR/${MEDIA_NAME[$1]}/$DDIR"
 	if [ ! -d "$DEST_DIR" ] ; then
 		$DRY mkdir -p "$DEST_DIR" || exit 2
@@ -87,13 +87,19 @@ while [ -d "$BK_MEDIA_DIR/${MEDIA_NAME[$LAST_MEDIA]}" ] ; do
 	let MEDIA_SIZE[$LAST_MEDIA]=$DISK_SIZE
 done
 
-pushd "$BACKUP_DIR"
-for FIL in $($PREPARE_MEDIA_LINE) ; do
+iter_media() {
+    MIN_ITER_SIZE=$1
+    pushd "$BACKUP_DIR"
+    for FIL in $($PREPARE_MEDIA_LINE | \
+	sed "s|^$BACKUP_DIR/||" ) ; do
 	if [ ! -f "$FIL" ] ; then
 		continue
 	fi
 	SIZ=$(file_size ${FIL})
-	# echo "$FIL: $SIZ"
+	if [ -n "$MIN_ITER_SIZE" ] && [ "$SIZ" -lt "$MIN_ITER_SIZE" ] ; then
+		# echo "$FIL: $SIZ, small, skipping"
+		continue
+	fi
 	# continue
 	if [ $SIZ -gt $DISK_SIZE ] ; then
 		put_large "${FIL}" || break
@@ -116,8 +122,14 @@ for FIL in $($PREPARE_MEDIA_LINE) ; do
 		done
 		put_media $CUR_MEDIA "${FIL}" $SIZ || break
 	fi
-done
+    done
+    popd
+}
 
-popd
+# Algorithm trick: process the >1GB files first, do a second
+# pass for smaller ones. This way, packing is better.
+iter_media 1000000
+iter_media  300000
+iter_media
 
 #eof
