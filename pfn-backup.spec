@@ -20,6 +20,9 @@ Source0:	pfn-backup-%{version}.tar.gz
 #BuildRequires:	gettext
 Requires(pre): tar
 Requires(postun): gnupg
+%if %{_target_vendor} == redhat
+BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-buildroot
+%endif
 
 %description
 Pfn-backup is a set of shell (bash) scripts that direct GNU tar into
@@ -58,7 +61,12 @@ for MLEVEL in 1 5 8 ; do
 	install -d %{buildroot}%{_mandir}/man$MLEVEL
 	install  doc/*.$MLEVEL %{buildroot}%{_mandir}/man$MLEVEL/
 	pushd %{buildroot}%{_mandir}/man$MLEVEL/
+%if %{_target_vendor} == redhat
+		gzip *.$MLEVEL
+%else
 		lzma *.$MLEVEL
+%endif
+		
 	popd
 done
 
@@ -82,7 +90,11 @@ touch	%{buildroot}/var/backup/index
 [ -n "%{buildroot}" -a "%{buildroot}" != / ] && rm -rf %{buildroot}
 
 %pre
+%if %{_target_vendor} == redhat
+groupadd -f -r backup
+%else
 %_pre_groupadd backup
+%endif
 
 %post
 %create_ghostfile /var/backup/index root backup 664
