@@ -43,6 +43,7 @@ let LAST_MEDIA=0
 let MAX_MEDIA=100
 
 let DISK_SIZE=4589843
+let DISK_SIZE_LARGE=8000000
 	#waste that much space in favour of file order
 let CLOSE_SIZE=1000
 MEDIA_BASE_NAME="dvd"
@@ -67,6 +68,7 @@ let MEDIA_SIZE[$LAST_MEDIA]=$DISK_SIZE
 
 if [ "$1" == '--dry-run' ] ; then
    DRY="echo"
+   shift 1
 fi
 
 while [ -d "$BK_MEDIA_DIR/${MEDIA_NAME[$LAST_MEDIA]}" ] ; do
@@ -88,6 +90,12 @@ while [ -d "$BK_MEDIA_DIR/${MEDIA_NAME[$LAST_MEDIA]}" ] ; do
 done
 
 iter_media() {
+    if [ -n "$1" ] && [ "$1" == "--large" ] ; then
+	USE_LARGE=y
+	shift 1
+    else
+	USE_LARGE=
+    fi
     MIN_ITER_SIZE=$1
     pushd "$BACKUP_DIR"
     for FIL in $($PREPARE_MEDIA_LINE | \
@@ -101,7 +109,8 @@ iter_media() {
 		continue
 	fi
 	# continue
-	if [ $SIZ -gt $DISK_SIZE ] ; then
+	if [ $SIZ -gt $DISK_SIZE ] && \
+		( [ "$USE_LARGE" != "y" ]  || [ $SIZ -gt $DISK_SIZE_LARGE ] ); then
 		put_large "${FIL}" || break
 	else
 		let CUR_MEDIA=$FIRST_MEDIA
@@ -117,7 +126,11 @@ iter_media() {
 			fi
 			if [ -z "${MEDIA_NAME[$CUR_MEDIA]}" ] ; then
 				MEDIA_NAME[$CUR_MEDIA]=${MEDIA_BASE_NAME}$((${CUR_MEDIA} + 1))
-				let MEDIA_SIZE[$CUR_MEDIA]=$DISK_SIZE
+				if [ $SIZ -gt $DISK_SIZE ] && [ "$USE_LARGE" == "y" ] ; then
+					let MEDIA_SIZE[$CUR_MEDIA]=$DISK_SIZE_LARGE
+				else
+					let MEDIA_SIZE[$CUR_MEDIA]=$DISK_SIZE
+				fi
 			fi
 		done
 		put_media $CUR_MEDIA "${FIL}" $SIZ || break
@@ -128,6 +141,10 @@ iter_media() {
 
 # Algorithm trick: process the >1GB files first, do a second
 # pass for smaller ones. This way, packing is better.
+if [ "$1" == '--large' ] ; then
+   iter_media --large $DISK_SIZE
+fi
+
 iter_media 1000000
 iter_media  300000
 iter_media
