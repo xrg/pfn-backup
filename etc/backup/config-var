@@ -1,1 +1,1 @@
-TAR_EXCLUDE_OPTIONS="--exclude tmp --exclude cache --exclude-caches --exclude empty --exclude spool/squid --exclude lib/rpm --exclude lib/urpmi --exclude pgsql/data"
+TAR_EXCLUDE_OPTIONS="--exclude tmp --exclude cache --exclude-caches --exclude empty --exclude spool/squid --exclude lib/rpm --exclude lib/urpmi --exclude pgsql/data --exclude var/lib/named/proc --exclude var/lib/named/dev --exclude var/lib/named/var/run --exclude var/lib/mlocate/mlocate.db"
