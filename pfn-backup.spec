@@ -15,7 +15,7 @@ Summary:	Pefnos Backup scripts
 Group:		Archiving/
 # BuildArch:	noarch
 License:	GPL
-Source0:	pfn-backup-%{version}.tar.gz
+Source0:	%git_bs_source pfn-backup-%{version}.tar.gz
 
 #BuildRequires:	gettext
 Requires(pre): tar
@@ -35,7 +35,6 @@ you may need to install this package with the Postgres server stopped.
 %prep
 %git_get_source
 %setup -q
-%git_gen_changelog
 
 %build
 # nothing to build!
@@ -121,5 +120,5 @@ fi
 			%{_mandir}/man5/*.5*
 			%{_mandir}/man8/*.8*
 
-%changelog -f Changelog.git.txt
+%changelog -f %{_sourcedir}/%{name}-changelog.gitrpm.txt
 
