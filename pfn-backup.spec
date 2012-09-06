@@ -14,7 +14,7 @@ Release:	%{release}
 Summary:	Pefnos Backup scripts
 Group:		Archiving/
 # BuildArch:	noarch
-License:	GPL
+License:	GPLv2
 Source0:	%git_bs_source pfn-backup-%{version}.tar.gz
 
 #BuildRequires:	gettext
@@ -58,7 +58,7 @@ install lib/hal/scripts/* %{buildroot}%{_libdir}/hal/scripts/
 #install the man pages
 for MLEVEL in 1 5 8 ; do
 	install -d %{buildroot}%{_mandir}/man$MLEVEL
-	install  doc/*.$MLEVEL %{buildroot}%{_mandir}/man$MLEVEL/
+	install doc/*.$MLEVEL %{buildroot}%{_mandir}/man$MLEVEL/
 	pushd %{buildroot}%{_mandir}/man$MLEVEL/
 %if %{_target_vendor} == redhat
 		gzip *.$MLEVEL
