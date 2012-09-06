@@ -23,3 +23,6 @@ BACKUP_DIR=/some-disk/backup/
 # Specify the GPG key to encrypt the backups with. This key must exist
 # in root's public keyring.
 #BACKUP_GPG_KEY=0x...
+
+# Arrange backup GPGs per month:
+# BACKUP_GPG_MONTH=y

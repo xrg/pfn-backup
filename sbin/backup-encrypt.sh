@@ -24,19 +24,24 @@ if [ -z "${BACKUP_GPG_KEY}" ] ; then
 	exit 2
 fi
 
-[ -d $BACKUP_DIR/gpg ] || mkdir "$BACKUP_DIR/gpg"
+GPG_BACKUP_DIR="$BACKUP_DIR/gpg"
+if [ "x$BACKUP_GPG_MONTH" == "xy" ] ; then
+	GPG_BACKUP_DIR+="$(date +'/%Y%m')"
+fi
+
+[ -d "$GPG_BACKUP_DIR" ] || mkdir "$GPG_BACKUP_DIR"
 
 encrypt_file() {
 	BASEFILE=$(basename "$1" .gz)
 	
-	OUTFILE="$BACKUP_DIR/gpg/$BASEFILE.gpg"
+	OUTFILE="$GPG_BACKUP_DIR/$BASEFILE.gpg"
 	TMCOUNT=1
 	while [ -e "$OUTFILE" ] ; do
 		if [ $TMCOUNT -gt 9 ] ; then
 			echo "File $BASEFILE is encrypted $TMCOUNT files already." >&2
 			return 1
 		fi
-		OUTFILE="$BACKUP_DIR/gpg/$BASEFILE-$TMCOUNT.gpg"
+		OUTFILE="$GPG_BACKUP_DIR/$BASEFILE-$TMCOUNT.gpg"
 		TMCOUNT=$(expr $TMCOUNT '+' 1)
 	done
 	
