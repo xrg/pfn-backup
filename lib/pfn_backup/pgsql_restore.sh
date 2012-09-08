@@ -1,6 +1,6 @@
 #!/bin/bash
 # 
-# Copyright (C) P. Christeas <p_christ@hol.gr>, 2008
+# Copyright (C) P. Christeas <xrg@hellug.gr>, 2008
 # This is free software.
 #
 
