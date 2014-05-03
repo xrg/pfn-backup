@@ -116,7 +116,10 @@ case "$TAR_COMPRESSION" in
 		TMP_TAR_OPTIONS="$TMP_TAR_OPTIONS -z"
 		TMP_TAR_EXT="tar.gz"
 	;;
-
+    xz)
+        TMP_TAR_OPTIONS="$TMP_TAR_OPTIONS -J"
+        TMP_TAR_EXT="tar.xz"
+    ;;
 	bzip2)
 		TMP_TAR_OPTIONS="$TMP_TAR_OPTIONS -j"
 		TMP_TAR_EXT="tar.bz2"

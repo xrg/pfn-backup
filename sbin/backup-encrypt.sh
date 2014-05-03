@@ -32,7 +32,7 @@ fi
 [ -d "$GPG_BACKUP_DIR" ] || mkdir "$GPG_BACKUP_DIR"
 
 encrypt_file() {
-	BASEFILE=$(basename "$1" .gz)
+	BASEFILE=$(basename "$1" "$2")
 	
 	OUTFILE="$GPG_BACKUP_DIR/$BASEFILE.gpg"
 	TMCOUNT=1
@@ -49,10 +49,12 @@ encrypt_file() {
 		rm -f "$1"
 }
 
-for FILE in $BACKUP_DIR/incoming/*.gz ; do
+for EXT in '.gz' '.xz' '.bz2' ; do
+  for FILE in $BACKUP_DIR/incoming/*.$EXT ; do
 	# if no incoming file, next check will fail
 	[ ! -f "$FILE" ] && continue
-	encrypt_file "$FILE"
+	encrypt_file "$FILE" "$EXT"
+  done
 done
 
 if [ -d ${BACKUP_DIR}/pgsql/wals ] ; then
