@@ -50,7 +50,7 @@ encrypt_file() {
 }
 
 for EXT in '.gz' '.xz' '.bz2' ; do
-  for FILE in $BACKUP_DIR/incoming/*.$EXT ; do
+  for FILE in $BACKUP_DIR/incoming/*$EXT ; do
 	# if no incoming file, next check will fail
 	[ ! -f "$FILE" ] && continue
 	encrypt_file "$FILE" "$EXT"
