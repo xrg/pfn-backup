@@ -50,17 +50,13 @@ encrypt_file() {
 }
 
 for EXT in '.gz' '.xz' '.bz2' ; do
-  for FILE in $BACKUP_DIR/incoming/*$EXT ; do
-	# if no incoming file, next check will fail
-	[ ! -f "$FILE" ] && continue
-	encrypt_file "$FILE" "$EXT"
-  done
+  find $BACKUP_DIR/incoming -type f -name '*'$EXT | \
+        while read FILE ; do encrypt_file "$FILE" "$EXT" ; done
 done
 
 if [ -d ${BACKUP_DIR}/pgsql/wals ] ; then
-	for FILE in $BACKUP_DIR/pgsql/wals/* ; do
-		encrypt_file "$FILE"
-	done
+  find $BACKUP_DIR/pgsql/wals/ -type f | \
+        while read FILE ; do encrypt_file "$FILE" ; done
 fi
 
 #eof
