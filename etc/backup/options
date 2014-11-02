@@ -6,18 +6,24 @@ USER_BACKUP=/usr/bin/user-backup.sh
 
 TAR_EXCLUDE_OPTIONS="-X /etc/backup/excludes"
 
-# Append information for each backup in this file
-BACKUP_INDEX_FILE=bkups.index
-
 BACKUP_GROUP=backup
 
 # Compute the MD5 of the file and put it into the backup (TODO)
 # GEN_MD5=y
 
+# Append information for each backup in this file
 BACKUP_INDEX_FILE=/var/backup/index
 TAR_DEFAULT_OPTIONS="-pSP"
+TAR_COMPRESSION="gz"
 
-BACKUP_DIR=/some-disk/backup/
+# This is where all backups will be temporarily stored
+# Please change to some path with enough space
+# BACKUP_DIR=/some-disk/backup/
+# and then, remove the following lines:
+if [ -z "$BACKUP_DIR" ] ; then
+        echo "BACKUP_DIR not specified!"
+        exit 1
+fi
 
 # BACKUP_USE_GPG=y
 # Specify the GPG key to encrypt the backups with. This key must exist
