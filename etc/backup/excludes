@@ -2,8 +2,8 @@
 Desktop/Trash
 .galeon/mozilla/galeon/Cache
 .gftp/cache
-.gimp-1.2/tmp
-.gimp-1.2/gimpswap*
+.gimp-*/tmp
+.gimp-*/gimpswap*
 hid
 mp3
 .kde/share/apps/kfmexec/tmp
@@ -14,10 +14,10 @@ mp3
 .kde/share/cache
 .mcop/trader-cache
 .mozilla/*/*.slt/Cache
+.mozilla/firefox/*/Cache
 .openoffice/user/temp
 .netscape/cache
 .bcast/*.idx
-*.o
 .ssh
 tmp
 .xauth
@@ -29,3 +29,4 @@ tmp
 .java/deployment/cache
 .java/.deployment/javaws/cache
 .lyx/cache
+*.tmp

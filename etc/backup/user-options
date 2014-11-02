@@ -1,1 +1,2 @@
-TAR_EXCLUDE_OPTIONS="--exclude-auto=.backupignore --exclude-caches --exclude-autofile=.cvsignore --exclude-autofile=.svnignore --exclude-auto=.gitignore -X /etc/backup/excludes"
+# TAR_EXCLUDE_OPTIONS="--exclude-auto=.backupignore --exclude-auto=.cvsignore --exclude-auto=.gitignore
+TAR_EXCLUDE_OPTIONS="-X /etc/backup/excludes --exclude-caches"
