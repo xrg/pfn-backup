@@ -1,7 +1,7 @@
 #Backup options
 
 # The command to use for 'tar'. GNU tar required
-TAR=/bin/tar
+TAR=$(which tar)
 USER_BACKUP=/usr/bin/user-backup.sh
 
 TAR_EXCLUDE_OPTIONS="-X /etc/backup/excludes"
