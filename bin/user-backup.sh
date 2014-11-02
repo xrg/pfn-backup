@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# User backup, by P. Christeas, (c) 2005-6
+# User backup, by P. Christeas, (c) 2005-14
 # This is free software!
 
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # global backup
-# by P. Christeas, (c) 2005-6
+# by P. Christeas, (c) 2005-14
 # This is free software!
 
 set -e

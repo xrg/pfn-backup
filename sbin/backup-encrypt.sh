@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 
-# by P. Christeas, (c) 2008
+# by P. Christeas, (c) 2008-2014
 # This is free software!
 
 set -e
