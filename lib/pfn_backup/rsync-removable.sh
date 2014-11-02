@@ -7,6 +7,8 @@
 
 set -e
 
+trap 'logger Error at $0:$LINENO $BASH_COMMAND ; exit' ERR SIGINT SIGQUIT
+
 FS_LABEL=''
 DO_BEEP=yes
 BEEP_CMD=true
@@ -23,7 +25,6 @@ RSYNC_OPTS=
 
 [ -f /etc/backup/options ] && \
 	. /etc/backup/options
-
 
 while getopts "qfd:l:v" OPTION ; do
 	case $OPTION in
@@ -46,7 +47,7 @@ while getopts "qfd:l:v" OPTION ; do
 done
 
 if [ ! -b "$FOUND_DEVICE" ] ; then
-	echo "Device \"$FOUND_DEVICE\" is not a block one!"
+	echo "Device \"$FOUND_DEVICE\" is not a block one!" | $OUT
 	exit 3
 fi
 
@@ -55,7 +56,7 @@ if [ -n "$BACKUP_DIR" ] ; then
 fi
 
 if [ "$DO_BEEP" == "yes" ] ; then
-	 BEEP_CMD="$(which beep) $BEEP_OPTS"
+	 BEEP_CMD="$(which beep) $BEEP_OPTS" || BEEP_CMD="true"
 fi
 
 if [ -n "$FS_LABEL" ] && [ "$FOUND_LABEL" != "$FS_LABEL" ] ; then
@@ -86,12 +87,12 @@ if [ -f $MNTPOINT/signature ] && cmp /root/signature $MNTPOINT/signature ; then
 		exit $RES
 	fi
 	#
-	umount $MNTPOINT
-	echo "Sync done,USB can be removed."
+	umount $MNTPOINT || :
+	echo "Sync done,USB can be removed." | $OUT
 	$BEEP_CMD -f 2000 -n -f 10 -l 50 -n -f 1000
 else
 	sleep 1
-	echo "Signature not found! Disk may be spoofed!"
+	echo "Signature not found! Disk may be spoofed!" | $OUT
 	umount $MNTPOINT || true
 	$BEEP_CMD -f 200 -l 500
 	exit 2
