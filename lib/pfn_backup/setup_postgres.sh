@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 
-# Copyright (C) P. Christeas <xrg@hellug.gr>, 2008
+# Copyright (C) P. Christeas <xrg@hellug.gr>, 2008-2015
 # This is free software.
 #
 
@@ -42,7 +42,7 @@ PFN_SHDIR=$(dirname $0)
 
 if ! cat ${PGDATA}/postgresql.conf | parse_pg_conf | grep 'archive_mode = on' ; then
 
-	if [ "$FORCE" != "y" ] && /etc/init.d/${NAME} status > /dev/null  ; then
+	if [ "$FORCE" != "y" ] && service ${NAME} status > /dev/null  ; then
 		echo 'This script should not be run with postgres running.'
 		echo 'Please, stop the server and try again.'
 		exit 3
@@ -50,9 +50,7 @@ if ! cat ${PGDATA}/postgresql.conf | parse_pg_conf | grep 'archive_mode = on' ; 
 	
 	echo "Patching ${PGDATA}/postgresql.conf"
 
-	cp -a ${PGDATA}/postgresql.conf ${PGDATA}/postgresql.conf.bak
-	
-	su - postgres -c "patch -p 1 -l ${PGDATA}/postgresql.conf ${PFN_SHDIR}/postgres.conf.patch"
+	sed -i.bak "s/#archive_mode\S*=.*/archive_mode = on/;s/#archive_command *= *''.*/archive_command = '\/usr\/lib\/pfn_backup\/pgsql_archive.sh \"%p\"'/;s/#archive_timeout\S*=\s*0/archive_timeout = 600/" ${PGDATA}/postgresql.conf
 	
 fi
 
