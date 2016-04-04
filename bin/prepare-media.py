@@ -78,7 +78,7 @@ class PMWorker(object):
               'cd':       700.0,
               'dvd':      4589.84,
               'dvd-dl':   8140.8,
-              'bd-sl':   23866.0,
+              'bd-sl':   23098.0, # unformatted: 23866.0
               'bd-dl':   47732.0,
               'bd-tl':   95466.0,
               'bd-ql':  122072.0,
