@@ -44,6 +44,7 @@ def custom_options(parser):
     pgroup.add_option('--output-dir', help="Directory where output media will be set")
     pgroup.add_option('--wontfit-dir', help="Directory of files not fit in allowed sizes")
     pgroup.add_option('--allowed-media', help="Comma-separated list of allowed disk types")
+    pgroup.add_option('--start-from', type=int, help="Number of volume to start from")
 
     parser.add_option_group(pgroup)
 
@@ -52,7 +53,8 @@ options._path_options += ['output_dir', 'wontfit_dir']
 options.init(options_prepare=custom_options,
         have_args=None,
         config='~/.openerp/backup.conf', config_section=(),
-        defaults={ 'allowed_media':'dvd', 'output_dir': 'outgoing', 'wontfit_dir': 'wontfit'})
+        defaults={ 'allowed_media':'dvd', 'output_dir': 'outgoing', 'wontfit_dir': 'wontfit',
+                  'start_from': 1})
 
 
 log = logging.getLogger('main')
@@ -84,9 +86,10 @@ class PMWorker(object):
     fill_factor = 99.0
     
     def __init__(self, allowed_media=None, wontfit_dir=None,
-                 path_pattern='disk%02d', sector_size=2048):
+                 path_pattern='disk%02d', sector_size=2048, start_from=1):
         self.allowed_media = allowed_media or []
         self.volume_dir = False
+        self.start_from = int(start_from)
         self.wontfit_dir = wontfit_dir
         self.sector_size = sector_size
         self.max_size = max([self.disk_sizes[s] * MB for s in self.allowed_media])
@@ -257,7 +260,7 @@ class PMWorker(object):
         # Fourth pass: assign a name (label) and tmp path on each new volume
         old_names = set()
         old_paths = set()
-        disk_num = 1
+        disk_num = self.start_from
         for mf in self.dest_manifests:
             if mf['path']:
                 old_paths.add(mf['path'])
@@ -343,7 +346,9 @@ class PMWorker(object):
         
 
 # Main flow:
-worker = PMWorker(allowed_media=options.opts.allowed_media.split(','), wontfit_dir=options.opts.wontfit_dir)
+worker = PMWorker(allowed_media=options.opts.allowed_media.split(','),
+                  wontfit_dir=options.opts.wontfit_dir,
+                  start_from=options.opts.start_from)
 
 worker.use_volume_dir(options.opts.output_dir)
 
