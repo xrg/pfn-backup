@@ -174,10 +174,8 @@ class PMWorker(object):
             if not filenames:
                 continue
             ssize = 0L
-            if os.sep in dirpath:
-                dirpath1 = dirpath.split(os.sep,1)[1] + os.sep
-            else:
-                dirpath1 = ""
+            assert dirpath.startswith(dpath), "Unexpected dirpath: %s" % dirpath
+            dirpath1 = dirpath[len(dpath):].lstrip(os.sep) + os.sep
             for f in filenames:
                 full_f = os.path.join(dirpath, f)
                 this_size = os.path.getsize(full_f)
