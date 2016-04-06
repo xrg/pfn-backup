@@ -211,6 +211,9 @@ class BaseManifestor(object):
 
         # Then, apply filtered list inplace
         manifest[:] = tmp_out_manifest
+    
+    def write_args(self):
+        return {}
 
 class SourceManifestor(BaseManifestor):
     log = logging.getLogger('manifestor.source')
@@ -262,24 +265,24 @@ class BaseStorageInterface(object):
     def __init__(self, options):
         pass
 
-    def filter_needed(self, in_fnames):
+    def filter_needed(self, in_fnames, **kwargs):
         """Take `in_fnames` list of (prefixed) input filenames, check with storage
 
             @return filtered list of names to compute MD5 sums for
         """
         raise NotImplementedError
 
-    def write_manifest(self, manifest):
+    def write_manifest(self, manifest, **kwargs):
         raise NotImplementedError
 
 class DryStorage(BaseStorageInterface):
     """Dry-run mode: just print results
     """
 
-    def filter_needed(self, in_fnames):
+    def filter_needed(self, in_fnames, **kwargs):
         return in_fnames
 
-    def write_manifest(self, manifest):
+    def write_manifest(self, manifest, **kwargs):
         print "Results:"
         from pprint import pprint
         pprint(manifest)
@@ -290,7 +293,7 @@ class JSONStorage(BaseStorageInterface):
         self.fname = opts.output
         self.old_manifest = []
 
-    def filter_needed(self, in_fnames):
+    def filter_needed(self, in_fnames, **kwargs):
         """Read existing JSON file, re-using previous results
         """
         if os.path.exists(self.fname):
@@ -305,7 +308,7 @@ class JSONStorage(BaseStorageInterface):
         else:
             return in_fnames
 
-    def write_manifest(self, manifest):
+    def write_manifest(self, manifest, **kwargs):
         self.old_manifest += manifest
         fp = open(self.fname, 'wb')
         json.dump(self.old_manifest, fp)
@@ -326,24 +329,26 @@ class F3Storage(BaseStorageInterface):
         self.rsession.cookies = cj
         self.upload_url = opts.upload_to
 
-    def filter_needed(self, in_fnames):
+    def filter_needed(self, in_fnames, **kwargs):
         headers = {'Content-type': 'application/json', }
+        post_data = {'mode': 'filter-needed', 'entries': in_fnames }
+        post_data.update(kwargs)
         pres = self.rsession.post(self.upload_url, headers=headers,
                                   verify=self.ssl_verify,
-                                  data=json.dumps({'mode': 'filter-needed',
-                                                   'entries': in_fnames })
+                                  data=json.dumps(post_data)
                                  )
         pres.raise_for_status()
         data = pres.json()
         assert isinstance(data, list), type(data)
         return data
 
-    def write_manifest(self, manifest):
+    def write_manifest(self, manifest, **kwargs):
         headers = {'Content-type': 'application/json', }
+        post_data = {'mode': 'upload', 'entries': manifest }
+        post_data.update(kwargs)
         pres = self.rsession.post(self.upload_url, headers=headers,
                                   verify=self.ssl_verify,
-                                  data=json.dumps({'mode': 'upload',
-                                                   'entries': manifest })
+                                  data=json.dumps(post_data)
                                  )
         pres.raise_for_status()
 
