@@ -189,7 +189,7 @@ class BaseManifestor(object):
                               sizeof_fmt(done_size), sizeof_fmt(todo_size))
             return True
 
-    def _filter_in(self, manifest, prefix, storage, mode):
+    def _filter_in(self, manifest, prefix, storage):
         if prefix:
             lname = lambda m: os.path.join(prefix, m['name'])
         else:
@@ -200,7 +200,7 @@ class BaseManifestor(object):
         while tmp_manifest:
             tmp = tmp_manifest[:1000]
             tmp_manifest = tmp_manifest[1000:]
-            outnames = storage.filter_needed(map(lname, tmp), mode)
+            outnames = storage.filter_needed(map(lname, tmp))
             if outnames:
                 outnames = set(outnames)
                 for t in tmp:
@@ -253,31 +253,30 @@ class SourceManifestor(BaseManifestor):
             it would be a waste of CPU+time to compute those already in.
             
         """
-        self._filter_in(self.in_manifest, self.prefix, storage, 'sources')
-        
+        self._filter_in(self.in_manifest, self.prefix, storage)
 
 class BaseStorageInterface(object):
     def __init__(self, options):
         pass
 
-    def filter_needed(self, in_fnames, mode):
+    def filter_needed(self, in_fnames):
         """Take `in_fnames` list of (prefixed) input filenames, check with storage
         
             @return filtered list of names to compute MD5 sums for
         """
         raise NotImplementedError
 
-    def write_manifest(self, manifest, mode):
+    def write_manifest(self, manifest):
         raise NotImplementedError
 
 class DryStorage(BaseStorageInterface):
     """Dry-run mode: just print results
     """
 
-    def filter_needed(self, in_fnames, mode):
+    def filter_needed(self, in_fnames):
         return in_fnames
 
-    def write_manifest(self, manifest, mode):
+    def write_manifest(self, manifest):
         print "Results:"
         from pprint import pprint
         pprint(manifest)
@@ -288,7 +287,7 @@ class JSONStorage(BaseStorageInterface):
         self.fname = opts.output
         self.old_manifest = []
 
-    def filter_needed(self, in_fnames, mode):
+    def filter_needed(self, in_fnames):
         """Read existing JSON file, re-using previous results
         """
         if os.path.exists(self.fname):
@@ -303,7 +302,8 @@ class JSONStorage(BaseStorageInterface):
         else:
             return in_fnames
     
-    def write_manifest(self, manifest, mode):
+
+    def write_manifest(self, manifest):
         self.old_manifest += manifest
         fp = open(self.fname, 'wb')
         json.dump(self.old_manifest, fp)
@@ -324,11 +324,11 @@ class F3Storage(BaseStorageInterface):
         self.rsession.cookies = cj
         self.upload_url = opts.upload_to
 
-    def filter_needed(self, in_fnames, mode):
+    def filter_needed(self, in_fnames):
         headers = {'Content-type': 'application/json', }
-        pres = self.rsession.post(self.upload_url, headers=headers, 
+        pres = self.rsession.post(self.upload_url, headers=headers,
                                   verify=self.ssl_verify,
-                                  data=json.dumps({'mode': 'filter-%s' % mode,
+                                  data=json.dumps({'mode': 'filter-needed',
                                                    'entries': in_fnames })
                                  )
         pres.raise_for_status()
@@ -336,11 +336,11 @@ class F3Storage(BaseStorageInterface):
         assert isinstance(data, list), type(data)
         return data
 
-    def write_manifest(self, manifest, mode):
+    def write_manifest(self, manifest):
         headers = {'Content-type': 'application/json', }
-        pres = self.rsession.post(self.upload_url, headers=headers, 
+        pres = self.rsession.post(self.upload_url, headers=headers,
                                   verify=self.ssl_verify,
-                                  data=json.dumps({'mode': 'upload-%s' % mode,
+                                  data=json.dumps({'mode': 'upload',
                                                    'entries': manifest })
                                  )
         pres.raise_for_status()
@@ -377,7 +377,7 @@ if options.opts.mode == 'sources':
     
  
     if worker.out_manifest:
-        storage.write_manifest(worker.out_manifest, 'sources')
+        storage.write_manifest(worker.out_manifest)
     else:
         log.warning("No manifest entries, nothing to save")
 
