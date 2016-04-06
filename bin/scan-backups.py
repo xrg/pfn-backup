@@ -27,6 +27,7 @@ def custom_options(parser):
     pgroup.add_option('--mode', help="Operation mode: sources, volume or udisks2")
     pgroup.add_option('--force', default=False, action='store_true', help="Continue on errors")
     pgroup.add_option('--fast-run', default=False, action='store_true', help="Limit scanning to 10sec or 1 GB, for test runs")
+
     pgroup.add_option('--dry-run', default=False, action='store_true', help="Just print the results")
     pgroup.add_option('--small-first', default=False, action='store_true',
                       help="Sort by size, compute smaller files first")
@@ -142,7 +143,7 @@ class BaseManifestor(object):
         """
         tp = sstime = time.time()
 
-        todo_size = sum([ x[1]['size'] for x in in_manifest])
+        todo_size = sum([ x['size'] for x in in_manifest])
         todo_num = len(in_manifest)
 
         dnum = 0
@@ -156,7 +157,8 @@ class BaseManifestor(object):
             if size_limit and done_size > size_limit:
                 break
 
-            dpath, mf = in_manifest.pop(0)
+            mf = in_manifest.pop(0)
+            dpath = mf.pop('base_path')
             mf_name = mf['name']
             if prefix:
                 mf_name = os.path.join(prefix, mf['name'])
@@ -248,12 +250,13 @@ class SourceManifestor(BaseManifestor):
 
     def filter_in(self, storage):
         """Check filenames of `in_manifest` against storage
-        
+
             storage can tell us if files need to be checked (MD5) at all,
             it would be a waste of CPU+time to compute those already in.
-            
+
         """
         self._filter_in(self.in_manifest, self.prefix, storage)
+
 
 class BaseStorageInterface(object):
     def __init__(self, options):
@@ -261,7 +264,7 @@ class BaseStorageInterface(object):
 
     def filter_needed(self, in_fnames):
         """Take `in_fnames` list of (prefixed) input filenames, check with storage
-        
+
             @return filtered list of names to compute MD5 sums for
         """
         raise NotImplementedError
@@ -296,12 +299,11 @@ class JSONStorage(BaseStorageInterface):
             assert isinstance(data, list), "Bad data: %s" % type(data)
             self.old_manifest = data
             old_fnames = set([o['name'] for o in self.old_manifest])
-            
+
             self.log.info("Old data read from %s", self.fname)
             return filter(lambda f: f not in old_fnames, in_fnames)
         else:
             return in_fnames
-    
 
     def write_manifest(self, manifest):
         self.old_manifest += manifest
@@ -309,7 +311,7 @@ class JSONStorage(BaseStorageInterface):
         json.dump(self.old_manifest, fp)
         fp.close()
         self.log.info("Results saved to %s", self.fname)
-        
+
 
 class F3Storage(BaseStorageInterface):
     log = logging.getLogger('storage.f3')
@@ -332,7 +334,7 @@ class F3Storage(BaseStorageInterface):
                                                    'entries': in_fnames })
                                  )
         pres.raise_for_status()
-        data = pres.json
+        data = pres.json()
         assert isinstance(data, list), type(data)
         return data
 
@@ -374,8 +376,7 @@ if options.opts.mode == 'sources':
     except KeyboardInterrupt:
         log.info('Canceling by user request, will still save output in 2 sec')
         time.sleep(2.0) # User can hit Ctrl+C, again, here
-    
- 
+
     if worker.out_manifest:
         storage.write_manifest(worker.out_manifest)
     else:
