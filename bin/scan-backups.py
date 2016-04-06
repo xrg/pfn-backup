@@ -24,7 +24,9 @@ def custom_options(parser):
     assert isinstance(parser, optparse.OptionParser)
 
     pgroup = optparse.OptionGroup(parser, "Generation options")
+    pgroup.add_option('--mode', help="Operation mode: sources, volume or udisks2")
     pgroup.add_option('--force', default=False, action='store_true', help="Continue on errors")
+    pgroup.add_option('--fast-run', default=False, action='store_true', help="Limit scanning to 10sec or 1 GB, for test runs")
     pgroup.add_option('--dry-run', default=False, action='store_true', help="Just print the results")
     pgroup.add_option('--small-first', default=False, action='store_true',
                       help="Sort by size, compute smaller files first")
@@ -122,7 +124,7 @@ class BaseManifestor(object):
 
         self.log.info("Located %d/%d files totalling %s in %s", n_files, n_allfiles, sizeof_fmt(msize), dpath)
         self.n_files += n_files
-        return True
+        return ret_manifest
 
     def _check_dirname(self, d):
         return self.use_hidden or (not d.startswith('.'))
@@ -187,6 +189,26 @@ class BaseManifestor(object):
                               sizeof_fmt(done_size), sizeof_fmt(todo_size))
             return True
 
+    def _filter_in(self, manifest, prefix, storage, mode):
+        if prefix:
+            lname = lambda m: os.path.join(prefix, m['name'])
+        else:
+            lname = lambda m: m['name']
+
+        tmp_manifest = manifest
+        tmp_out_manifest = []
+        while tmp_manifest:
+            tmp = tmp_manifest[:1000]
+            tmp_manifest = tmp_manifest[1000:]
+            outnames = storage.filter_needed(map(lname, tmp), mode)
+            if outnames:
+                outnames = set(outnames)
+                for t in tmp:
+                    if lname(t) in outnames:
+                        tmp_out_manifest.append(t)
+
+        # Then, apply filtered list inplace
+        manifest[:] = tmp_out_manifest
 
 class SourceManifestor(BaseManifestor):
     log = logging.getLogger('manifestor.source')
@@ -221,87 +243,146 @@ class SourceManifestor(BaseManifestor):
             @param time_limit time (seconds) to stop after. Useful for test runs
         """
 
-        self._compute_sums(self.in_manifest, self.out_manifest,
+        self._compute_sums(self.in_manifest, self.out_manifest, prefix=self.prefix,
                            time_limit=time_limit, size_limit=size_limit)
 
-    def read_out(self, out_pname):
+    def filter_in(self, storage):
+        """Check filenames of `in_manifest` against storage
+        
+            storage can tell us if files need to be checked (MD5) at all,
+            it would be a waste of CPU+time to compute those already in.
+            
+        """
+        self._filter_in(self.in_manifest, self.prefix, storage, 'sources')
+        
+
+class BaseStorageInterface(object):
+    def __init__(self, options):
+        pass
+
+    def filter_needed(self, in_fnames, mode):
+        """Take `in_fnames` list of (prefixed) input filenames, check with storage
+        
+            @return filtered list of names to compute MD5 sums for
+        """
+        raise NotImplementedError
+
+    def write_manifest(self, manifest, mode):
+        raise NotImplementedError
+
+class DryStorage(BaseStorageInterface):
+    """Dry-run mode: just print results
+    """
+
+    def filter_needed(self, in_fnames, mode):
+        return in_fnames
+
+    def write_manifest(self, manifest, mode):
+        print "Results:"
+        from pprint import pprint
+        pprint(manifest)
+
+class JSONStorage(BaseStorageInterface):
+    log = logging.getLogger('storage.json')
+    def __init__(self, opts):
+        self.fname = opts.output
+        self.old_manifest = []
+
+    def filter_needed(self, in_fnames, mode):
         """Read existing JSON file, re-using previous results
         """
-        if os.path.exists(out_pname):
-            fp = file(out_pname, 'rb')
+        if os.path.exists(self.fname):
+            fp = file(self.fname, 'rb')
             data = json.load(fp)
             assert isinstance(data, list), "Bad data: %s" % type(data)
-            self.out_manifest = data
-            return True
+            self.old_manifest = data
+            old_fnames = set([o['name'] for o in self.old_manifest])
+            
+            self.log.info("Old data read from %s", self.fname)
+            return filter(lambda f: f not in old_fnames, in_fnames)
         else:
-            return False
-
-    def write_out(self, out_pname):
-        """Write results to output JSON file
-        """
-        fp = open(out_pname, 'wb')
-        json.dump(self.out_manifest, fp)
+            return in_fnames
+    
+    def write_manifest(self, manifest, mode):
+        self.old_manifest += manifest
+        fp = open(self.fname, 'wb')
+        json.dump(self.old_manifest, fp)
         fp.close()
-        self.log.info("Results saved to %s", out_pname)
+        self.log.info("Results saved to %s", self.fname)
+        
 
-worker = SourceManifestor(options.opts.prefix)
+class F3Storage(BaseStorageInterface):
+    log = logging.getLogger('storage.f3')
+    def __init__(self, opts):
+        self.ssl_verify = True
+        if opts.insecure:
+            self.ssl_verify = False
+        self.rsession = requests.Session()
+        cj = cookielib.MozillaCookieJar()
+        if opts.cookies_file and os.path.exists(opts.cookies_file):
+            cj.load(opts.cookies_file)
+        self.rsession.cookies = cj
+        self.upload_url = opts.upload_to
 
-ssl_verify = True
-if options.opts.insecure:
-    ssl_verify = False
+    def filter_needed(self, in_fnames, mode):
+        headers = {'Content-type': 'application/json', }
+        pres = self.rsession.post(self.upload_url, headers=headers, 
+                                  verify=self.ssl_verify,
+                                  data=json.dumps({'mode': 'filter-%s' % mode,
+                                                   'entries': in_fnames })
+                                 )
+        pres.raise_for_status()
+        data = pres.json
+        assert isinstance(data, list), type(data)
+        return data
 
-cj = cookielib.MozillaCookieJar()
-if options.opts.cookies_file and os.path.exists(options.opts.cookies_file):
-    cj.load(options.opts.cookies_file)
+    def write_manifest(self, manifest, mode):
+        headers = {'Content-type': 'application/json', }
+        pres = self.rsession.post(self.upload_url, headers=headers, 
+                                  verify=self.ssl_verify,
+                                  data=json.dumps({'mode': 'upload-%s' % mode,
+                                                   'entries': manifest })
+                                 )
+        pres.raise_for_status()
 
-rsession = False
 if options.opts.upload_to:
-    rsession = requests.Session()
-    rsession.cookies = cj
+    storage = F3Storage(options.opts)
+elif options.opts.output:
+    storage = JSONStorage(options.opts)
+elif options.opts.dry_run:
+    storage = DryStorage(options.opts)
+else:
+    log.error("Must select storage mode: dry-run, output-file or upload-to URL")
+    sys.exit(1)
 
-if False:
-    pres = rsession.get(options.opts.upload_to, verify=ssl_verify)
-    pres.raise_for_status()
-    data = pres.json
-    assert isinstance(data, list)
-    worker.out_manifest = data
-    log.info("Loaded ")
+comp_kwargs = {}
+if options.opts.fast_run:
+    comp_kwargs['limit'] = 10.0 # sec
+    comp_kwargs['size_limit'] = pow(1024.0, 3)
 
-if (not worker.out_manifest) and options.opts.output:
-    worker.read_out(options.opts.output)
+if options.opts.mode == 'sources':
+    worker = SourceManifestor(options.opts.prefix)
+    for fpath in options.args:
+        worker.scan_dir(fpath)
 
-for fpath in options.args:
-    worker.scan_dir(fpath)
-
-if options.opts.small_first:
-    log.debug("Sorting by size")
-    worker.sort_by_size()
-
-if True:
-    kwargs = {}
-    if options.opts.dry_run:
-        kwargs['limit'] = 10.0 # sec
-        kwargs['size_limit'] = pow(1024.0, 3)
-
+    worker.filter_in(storage)
+    if options.opts.small_first:
+        log.debug("Sorting by size")
+        worker.sort_by_size()
     try:
-        worker.compute_sums(**kwargs)
+        worker.compute_sums(**comp_kwargs)
     except KeyboardInterrupt:
         log.info('Canceling by user request, will still save output in 2 sec')
         time.sleep(2.0) # User can hit Ctrl+C, again, here
+    
+ 
+    if worker.out_manifest:
+        storage.write_manifest(worker.out_manifest, 'sources')
+    else:
+        log.warning("No manifest entries, nothing to save")
 
-if options.opts.dry_run:
-    print "Results:"
-    from pprint import pprint
-    pprint(worker.out_manifest)
-elif rsession:
-    headers = {'Content-type': 'application/json', }
-    pres = rsession.post(options.opts.upload_to, headers=headers, verify=ssl_verify,
-                         data=json.dumps({'mode': 'upload',
-                                          'entries': worker.out_manifest })
-                         )
-    pres.raise_for_status()
 else:
-    if options.opts.output:
-        worker.write_out(options.opts.output)
+    log.error("Invalid mode: %s", options.opts.mode)
+    sys.exit(1)
 
 #eof
