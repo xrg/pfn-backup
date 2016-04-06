@@ -28,7 +28,7 @@ def custom_options(parser):
     pgroup.add_option('--dry-run', default=False, action='store_true', help="Just print the results")
     pgroup.add_option('--small-first', default=False, action='store_true',
                       help="Sort by size, compute smaller files first")
-    
+
     pgroup.add_option('--prefix', help="Add this (directory) prefix to scanned paths")
     pgroup.add_option('-o', '--output', help="Write output JSON file (re-use existing data)")
 
@@ -54,112 +54,23 @@ def sizeof_fmt(num, suffix='B'):
         num /= 1024.0
     return "%.1f%s%s" % (num, 'Yi', suffix)
 
-class Manifestor(object):
+
+class BaseManifestor(object):
     log = logging.getLogger('manifestor')
     BS = 1024 * 1024
 
-    def __init__(self, prefix=None):
+    def __init__(self):
         self.n_files = 0
         self.n_errors = 0
-        self.in_manifest = []
-        self.out_manifest = []
-        self.prefix = prefix
-    
+        self.use_hidden = True
+
     def walk_error(self, ose):
         self.log.error("error: %s", ose)
         self.n_errors += 1
-  
-    def scan_dir(self, dpath):
-        if not os.path.isdir(dpath):
-            self.log.error("Input arguments must be directories. \"%s\" is not", dpath)
-            self.n_errors += 1
-            return False
-        
-        msize = 0L
-        n_files = 0
-        for dirpath, dirnames, filenames in os.walk(dpath, onerror=self.walk_error):
-            self.log.debug("Walking: %s", dirpath)
-            if not filenames:
-                continue
-            assert dirpath.startswith(dpath), "Unexpected dirpath: %s" % dirpath
-            dirpath1 = dirpath[len(dpath):].lstrip(os.sep) + os.sep
-            for f in filenames:
-                full_f = os.path.join(dirpath, f)
-                this_size = os.path.getsize(full_f)
-                self.in_manifest.append((dpath, {'name': dirpath1 + f, 'size': this_size, 'md5sum': None}))
-                n_files += 1
-                msize += this_size
-            
-        self.log.info("Located %d files totalling %s in %s", n_files, sizeof_fmt(msize), dpath)
-        self.n_files += n_files
-        return True
-
-    def sort_by_size(self):
-        """Put smaller files first
-        
-            This helps the algorithm get done with "easy" files, first, so that
-            possible errors (on larger files, greatest probability) occur last
-        """
-        self.in_manifest.sort(key=lambda x: x[1]['size'])
-
-    def compute_sums(self, limit=False, size_limit=False):
-        """Compute MD5 sums of `in_manifest` files into `out_manifest`
-        
-            @param limit time (seconds) to stop after. Useful for test runs
-        """
-        
-        tp = sstime = time.time()
-        
-        todo_size = sum([ x[1]['size'] for x in self.in_manifest])
-        todo_num = len(self.in_manifest)
-        
-        dnum = 0
-        done_size = 0L
-        out_names = set([m['name'] for m in self.out_manifest])
-        while self.in_manifest:
-            t2 = time.time()
-            if limit and (t2 > (sstime + limit)):
-                self.log.debug("Stopping on deadline")
-                break
-            if size_limit and done_size > size_limit:
-                break
-            
-            dpath, mf = self.in_manifest.pop(0)
-            mf_name = mf['name']
-            if self.prefix:
-                mf_name = os.path.join(self.prefix, mf['name'])
-            if mf_name in out_names:
-                continue
-
-            if not mf['md5sum']:
-                try:
-                    mf['md5sum'] = self.md5sum(os.path.join(dpath, mf['name']))
-                except Exception:
-                    self.n_errors += 1
-                    self.log.warning("Cannot compute %s", mf['name'], exc_info=True)
-                    mf['md5sum'] = 'unreadable'
-            
-            mf['name'] = mf_name # use the one with prefix
-            self.out_manifest.append(mf)
-            done_size += mf['size']
-            dnum += 1
-            
-            # This process is expected to be long, progress indication is essential
-            if (time.time() - tp) > 2.0:
-                self.log.info("Computed %d/%d files, %s of %s", dnum, todo_num,
-                              sizeof_fmt(done_size), sizeof_fmt(todo_size))
-                tp = time.time()
-        
-        if self.in_manifest:
-            return False
-        else:
-            self.log.info("Finished, computed %d/%d files, %s of %s", dnum, todo_num,
-                              sizeof_fmt(done_size), sizeof_fmt(todo_size))
-            return True
 
     def md5sum(self, full_path):
         """Compute MD5 sum of some file
-        
+
             Fear not, the core of this algorithm is an OpenSSL C function,
             which can be efficient enough for large buffers of input data.
             Using 1MB of buffer, this loop has been timed to perform as
@@ -176,8 +87,142 @@ class Manifestor(object):
                 md5.update(data)
         finally:
             fp.close()
-        
+
         return md5.digest().encode('hex')
+
+    def _scan_dir(self, dpath):
+        """Scan directory `dpath` for archive files, return their manifest
+
+            @return manifest, aka. list of {name, size, [md5sum], base_path }
+                `base_path` is `dpath`, ie. part not participating in `name`
+        """
+        msize = 0L
+        n_files = 0
+        n_allfiles = 0
+        ret_manifest = []
+        for dirpath, dirnames, filenames in os.walk(dpath, onerror=self.walk_error):
+            self.log.debug("Walking: %s", dirpath)
+            if not filenames:
+                continue
+            assert dirpath.startswith(dpath), "Unexpected dirpath: %s" % dirpath
+            dirpath1 = dirpath[len(dpath):].lstrip(os.sep) + os.sep
+            if not self._check_dirname(dirpath1):
+                self.log.debug("Skipping dir: %s", dirpath1)
+                continue
+            for f in filenames:
+                n_allfiles += 1
+                if not self._check_filename(f):
+                    self.log.debug("Skipping file: %s", f)
+                    continue
+                full_f = os.path.join(dirpath, f)
+                this_size = os.path.getsize(full_f)
+                ret_manifest.append({'name': dirpath1 + f, 'size': this_size, 'md5sum': None, 'base_path': dpath})
+                n_files += 1
+                msize += this_size
+
+        self.log.info("Located %d/%d files totalling %s in %s", n_files, n_allfiles, sizeof_fmt(msize), dpath)
+        self.n_files += n_files
+        return True
+
+    def _check_dirname(self, d):
+        return self.use_hidden or (not d.startswith('.'))
+
+    def _check_filename(self, f):
+        return self.use_hidden or (not f.startswith('.'))
+
+
+    def _compute_sums(self, in_manifest, out_manifest, prefix=False,
+                      time_limit=False, size_limit=False):
+        """Read files from `in_manifest`, compute their MD5 sums, put in `out_manifest`
+
+            If a file is already in `out_manifest`, skip
+            @param prefix   prepend this to filename before storing on `out_manifest`
+        """
+        tp = sstime = time.time()
+
+        todo_size = sum([ x[1]['size'] for x in in_manifest])
+        todo_num = len(in_manifest)
+
+        dnum = 0
+        done_size = 0L
+        out_names = set([m['name'] for m in out_manifest])
+        while in_manifest:
+            t2 = time.time()
+            if time_limit and (t2 > (sstime + time_limit)):
+                self.log.debug("Stopping on deadline")
+                break
+            if size_limit and done_size > size_limit:
+                break
+
+            dpath, mf = in_manifest.pop(0)
+            mf_name = mf['name']
+            if prefix:
+                mf_name = os.path.join(prefix, mf['name'])
+            if mf_name in out_names:
+                continue
+
+            if not mf['md5sum']:
+                try:
+                    mf['md5sum'] = self.md5sum(os.path.join(dpath, mf['name']))
+                except Exception:
+                    self.n_errors += 1
+                    self.log.warning("Cannot compute %s", mf['name'], exc_info=True)
+                    mf['md5sum'] = 'unreadable'
+
+            mf['name'] = mf_name # use the one with prefix
+            out_manifest.append(mf)
+            done_size += mf['size']
+            dnum += 1
+
+            # This process is expected to be long, progress indication is essential
+            if (time.time() - tp) > 2.0:
+                self.log.info("Computed %d/%d files, %s of %s", dnum, todo_num,
+                              sizeof_fmt(done_size), sizeof_fmt(todo_size))
+                tp = time.time()
+
+        if in_manifest:
+            return False
+        else:
+            self.log.info("Finished, computed %d/%d files, %s of %s", dnum, todo_num,
+                              sizeof_fmt(done_size), sizeof_fmt(todo_size))
+            return True
+
+
+class SourceManifestor(BaseManifestor):
+    log = logging.getLogger('manifestor.source')
+
+    def __init__(self, prefix=None):
+        super(SourceManifestor, self).__init__()
+        self.in_manifest = []
+        self.out_manifest = []
+        self.prefix = prefix
+
+
+    def scan_dir(self, dpath):
+        if not os.path.isdir(dpath):
+            self.log.error("Input arguments must be directories. \"%s\" is not", dpath)
+            self.n_errors += 1
+            return False
+        self.in_manifest += self._scan_dir(dpath)
+        return True
+
+
+    def sort_by_size(self):
+        """Put smaller files first
+
+            This helps the algorithm get done with "easy" files, first, so that
+            possible errors (on larger files, greatest probability) occur last
+        """
+        self.in_manifest.sort(key=lambda x: x[1]['size'])
+
+    def compute_sums(self, time_limit=False, size_limit=False):
+        """Compute MD5 sums of `in_manifest` files into `out_manifest`
+
+            @param time_limit time (seconds) to stop after. Useful for test runs
+        """
+
+        self._compute_sums(self.in_manifest, self.out_manifest,
+                           time_limit=time_limit, size_limit=size_limit)
 
     def read_out(self, out_pname):
         """Read existing JSON file, re-using previous results
@@ -190,7 +235,7 @@ class Manifestor(object):
             return True
         else:
             return False
-       
+
     def write_out(self, out_pname):
         """Write results to output JSON file
         """
@@ -199,7 +244,7 @@ class Manifestor(object):
         fp.close()
         self.log.info("Results saved to %s", out_pname)
 
-worker = Manifestor(options.opts.prefix)
+worker = SourceManifestor(options.opts.prefix)
 
 ssl_verify = True
 if options.opts.insecure:
@@ -237,7 +282,7 @@ if True:
     if options.opts.dry_run:
         kwargs['limit'] = 10.0 # sec
         kwargs['size_limit'] = pow(1024.0, 3)
-    
+
     try:
         worker.compute_sums(**kwargs)
     except KeyboardInterrupt:
