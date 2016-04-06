@@ -32,14 +32,17 @@ def custom_options(parser):
     pgroup.add_option('--prefix', help="Add this (directory) prefix to scanned paths")
     pgroup.add_option('-o', '--output', help="Write output JSON file (re-use existing data)")
 
+    pgroup.add_option('-u', '--upload-to', help="URL of service to upload manifests onto")
+    pgroup.add_option('-b', '--cookies-file', help='Cookie jar file')
+    pgroup.add_option('-k', '--insecure', help="Skip SSL certificate verification")
     parser.add_option_group(pgroup)
 
 options.allow_include = 3
-options._path_options += ['output', ]
+options._path_options += ['output', 'cookies_file' ]
 options.init(options_prepare=custom_options,
         have_args=None,
         config='~/.openerp/backup.conf', config_section=(),
-        defaults={ })
+        defaults={ 'cookies_file': '~/.f3_upload_cookies.txt', })
 
 
 log = logging.getLogger('main')
@@ -200,7 +203,28 @@ class Manifestor(object):
 
 worker = Manifestor(options.opts.prefix)
 
-if options.opts.output:
+ssl_verify = True
+if options.opts.insecure:
+    ssl_verify = False
+
+cj = cookielib.MozillaCookieJar()
+if options.opts.cookies_file and os.path.exists(options.opts.cookies_file):
+    cj.load(options.opts.cookies_file)
+
+rsession = False
+if options.opts.upload_to:
+    rsession = requests.Session()
+    rsession.cookies = cj
+
+if False:
+    pres = rsession.get(options.opts.upload_to, verify=ssl_verify)
+    pres.raise_for_status()
+    data = pres.json
+    assert isinstance(data, list)
+    worker.out_manifest = data
+    log.info("Loaded ")
+
+if (not worker.out_manifest) and options.opts.output:
     worker.read_out(options.opts.output)
 
 for fpath in options.args:
@@ -226,6 +250,13 @@ if options.opts.dry_run:
     print "Results:"
     from pprint import pprint
     pprint(worker.out_manifest)
+elif rsession:
+    headers = {'Content-type': 'application/json', }
+    pres = rsession.post(options.opts.upload_to, headers=headers, verify=ssl_verify,
+                         data=json.dumps({'mode': 'upload',
+                                          'entries': worker.out_manifest })
+                         )
+    pres.raise_for_status()
 else:
     if options.opts.output:
         worker.write_out(options.opts.output)
