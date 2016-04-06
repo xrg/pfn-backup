@@ -47,6 +47,12 @@ options.init(options_prepare=custom_options,
 
 log = logging.getLogger('main')
 
+def sizeof_fmt(num, suffix='B'):
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
 
 class Manifestor(object):
     log = logging.getLogger('manifestor')
@@ -63,14 +69,6 @@ class Manifestor(object):
         self.log.error("error: %s", ose)
         self.n_errors += 1
   
-    @staticmethod
-    def sizeof_fmt(num, suffix='B'):
-        for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
-            if abs(num) < 1024.0:
-                return "%3.1f%s%s" % (num, unit, suffix)
-            num /= 1024.0
-        return "%.1f%s%s" % (num, 'Yi', suffix)
-
     def scan_dir(self, dpath):
         if not os.path.isdir(dpath):
             self.log.error("Input arguments must be directories. \"%s\" is not", dpath)
@@ -92,7 +90,7 @@ class Manifestor(object):
                 n_files += 1
                 msize += this_size
             
-        self.log.info("Located %d files totalling %s in %s", n_files, self.sizeof_fmt(msize), dpath)
+        self.log.info("Located %d files totalling %s in %s", n_files, sizeof_fmt(msize), dpath)
         self.n_files += n_files
         return True
 
@@ -149,14 +147,14 @@ class Manifestor(object):
             # This process is expected to be long, progress indication is essential
             if (time.time() - tp) > 2.0:
                 self.log.info("Computed %d/%d files, %s of %s", dnum, todo_num,
-                              self.sizeof_fmt(done_size), self.sizeof_fmt(todo_size))
+                              sizeof_fmt(done_size), sizeof_fmt(todo_size))
                 tp = time.time()
         
         if self.in_manifest:
             return False
         else:
             self.log.info("Finished, computed %d/%d files, %s of %s", dnum, todo_num,
-                              self.sizeof_fmt(done_size), self.sizeof_fmt(todo_size))
+                              sizeof_fmt(done_size), sizeof_fmt(todo_size))
             return True
 
     def md5sum(self, full_path):
