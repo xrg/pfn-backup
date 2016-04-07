@@ -436,6 +436,8 @@ class UDisks2Mgr(object):
     def __init__(self):
         self._bus = dbus.SystemBus()
         self._drives = {}
+        self._work_queue = []
+        self._queue_lock = threading.Condition()
 
     def _setup_listeners(self):
         """Setup DBus callbacks for notifications
@@ -469,16 +471,55 @@ class UDisks2Mgr(object):
         if 'org.freedesktop.UDisks2.Drive' in intfs:
             self._drives.pop(path, None)
         
-
-    def start_loop(self):
+    def main_loop(self, storage):
+        """ This will start TWO threads: one for DBus signals and one for work-queue run
+        
+        """
+        running = True
         def __glib_loop():
             loop = gobject.MainLoop()
             loop.run()
+            
+        def __work_loop():
+            while running:
+                self.log.debug("Work queue main-loop")
+                task = None
+                self._queue_lock.acquire()
+                try:
+                    if self._work_queue:
+                        task = self._work_queue.pop(0)
+                    else:
+                        self._queue_lock.wait(60.0)
+                except Exception:
+                    self.log.exception("Cannot use work queue:")
+                finally:
+                    self._queue_lock.release()
+                
+                if task is None:
+                    continue
+                try:
+                    task.execute(storage)
+                except Exception:
+                    self.log.exception("Cannot perform %s:", task, exc_info=True)
+
         thr = threading.Thread(target=__glib_loop)
         thr.daemon=True
         self._setup_listeners()
-        print "starting loop"
+        self.log.info("Starting DBus loop")
         thr.start()
+        
+        thr2 = threading.Thread(target=__work_loop)
+        thr2.daemon=True
+        thr2.start()
+        
+        try:
+            while True:
+                time.sleep(10.0)
+        except KeyboardInterrupt:
+            pass
+        self.log.info("Stopping.")
+        running = False
+        return
 
     def get_drive(self, path, i_props=None):
         if path not in self._drives:
@@ -499,8 +540,11 @@ class UDisks2Mgr(object):
         self.log.debug("drive path: %s", drive_path)
         self.log.debug("Found new %(IdType)s fs \"%(IdLabel)s\" of %(Size)s (UUID: %(IdUUID)s)" % block_props)
         drive = self.get_drive(drive_path)
-        time.sleep(2)
-        drive.eject()
+        with self._queue_lock:
+            if block_props['IdType'] in ('iso9660', 'udf', 'vfat'):
+                self._queue_lock.notifyAll()
+            else:
+                self.log.info("Ignoring %s filesystem on %s", block_props['IdType'], array2str(block_props['Device']))
 
 if options.opts.upload_to:
     storage = F3Storage(options.opts)
@@ -571,11 +615,7 @@ elif options.opts.mode in ('udisks', 'udisks2'):
     DBusGMainLoop(set_as_default=True)
     
     umgr = UDisks2Mgr()
-    umgr.start_loop()
-
-    while True:
-        time.sleep(5)
-
+    umgr.main_loop(storage)
 
 else:
     log.error("Invalid mode: %s", options.opts.mode)
