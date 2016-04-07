@@ -66,10 +66,14 @@ class BaseManifestor(object):
         self.n_files = 0
         self.n_errors = 0
         self.use_hidden = True
+        self.context = {}
 
     def walk_error(self, ose):
         self.log.error("error: %s", ose)
         self.n_errors += 1
+
+    def get_out_manifest(self):
+        raise NotImplementedError
 
     def md5sum(self, full_path):
         """Compute MD5 sum of some file
@@ -217,9 +221,7 @@ class BaseManifestor(object):
 
         # Then, apply filtered list inplace
         manifest[:] = tmp_out_manifest
-    
-    def write_args(self):
-        return {}
+
 
 class SourceManifestor(BaseManifestor):
     log = logging.getLogger('manifestor.source')
@@ -239,6 +241,8 @@ class SourceManifestor(BaseManifestor):
         self.in_manifest += self._scan_dir(dpath)
         return True
 
+    def get_out_manifest(self):
+        return self.out_manifest
 
     def sort_by_size(self):
         """Put smaller files first
@@ -273,8 +277,10 @@ class VolumeManifestor(BaseManifestor):
     def __init__(self, label=''):
         super(VolumeManifestor, self).__init__()
         self.manifest = []
-        self.label = ''
+        self.context['vol_label'] = label
 
+    def get_out_manifest(self):
+        return self.manifest
 
     def scan_dir(self, dpath):
         if not os.path.isdir(dpath):
@@ -316,8 +322,6 @@ class VolumeManifestor(BaseManifestor):
         """
         self._filter_in(self.manifest, False, storage)
 
-    def write_args(self):
-        return {'label': self.label}
 
 class BaseStorageInterface(object):
     def __init__(self, options):
@@ -330,7 +334,7 @@ class BaseStorageInterface(object):
         """
         raise NotImplementedError
 
-    def write_manifest(self, manifest, **kwargs):
+    def write_manifest(self, worker):
         raise NotImplementedError
 
 class DryStorage(BaseStorageInterface):
@@ -340,10 +344,10 @@ class DryStorage(BaseStorageInterface):
     def filter_needed(self, in_fnames, **kwargs):
         return in_fnames
 
-    def write_manifest(self, manifest, **kwargs):
+    def write_manifest(self, worker):
         print "Results:"
         from pprint import pprint
-        pprint(manifest)
+        pprint(worker.get_out_manifest())
 
 class JSONStorage(BaseStorageInterface):
     log = logging.getLogger('storage.json')
@@ -351,7 +355,7 @@ class JSONStorage(BaseStorageInterface):
         self.fname = opts.output
         self.old_manifest = []
 
-    def filter_needed(self, in_fnames, **kwargs):
+    def filter_needed(self, in_fnames, worker):
         """Read existing JSON file, re-using previous results
         """
         if os.path.exists(self.fname):
@@ -366,8 +370,8 @@ class JSONStorage(BaseStorageInterface):
         else:
             return in_fnames
 
-    def write_manifest(self, manifest, **kwargs):
-        self.old_manifest += manifest
+    def write_manifest(self, worker):
+        self.old_manifest += worker.get_out_manifest()
         fp = open(self.fname, 'wb')
         json.dump(self.old_manifest, fp)
         fp.close()
@@ -387,7 +391,7 @@ class F3Storage(BaseStorageInterface):
         self.rsession.cookies = cj
         self.upload_url = opts.upload_to
 
-    def filter_needed(self, in_fnames, **kwargs):
+    def filter_needed(self, in_fnames, worker):
         headers = {'Content-type': 'application/json', }
         post_data = {'mode': 'filter-needed', 'entries': in_fnames }
         post_data.update(kwargs)
@@ -400,11 +404,13 @@ class F3Storage(BaseStorageInterface):
         assert isinstance(data, list), type(data)
         return data
 
-    def write_manifest(self, manifest, **kwargs):
+    def write_manifest(self, worker):
         headers = {'Content-type': 'application/json', }
-        post_data = {'mode': 'upload', 'entries': manifest }
-        post_data.update(kwargs)
-        pres = self.rsession.post(self.upload_url, headers=headers,
+        post_data = {'mode': 'upload', 'entries': worker.get_out_manifest() }
+        url = self.upload_url
+        if 'vol_label' in worker.context:
+            post_data['vol_label'] = worker.context['vol_label']
+        pres = self.rsession.post(url, headers=headers,
                                   verify=self.ssl_verify,
                                   data=json.dumps(post_data)
                                  )
@@ -441,7 +447,7 @@ if options.opts.mode == 'sources':
         time.sleep(2.0) # User can hit Ctrl+C, again, here
 
     if worker.out_manifest:
-        storage.write_manifest(worker.out_manifest)
+        storage.write_manifest(worker)
     else:
         log.warning("No manifest entries, nothing to save")
 
@@ -465,7 +471,7 @@ elif options.opts.mode == 'volume-dir':
         time.sleep(2.0) # User can hit Ctrl+C, again, here
 
     if worker.manifest:
-        storage.write_manifest(worker.manifest)
+        storage.write_manifest(worker)
     else:
         log.warning("No manifest entries, nothing to save")
 else:
