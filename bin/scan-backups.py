@@ -108,7 +108,9 @@ class BaseManifestor(object):
             if not filenames:
                 continue
             assert dirpath.startswith(dpath), "Unexpected dirpath: %s" % dirpath
-            dirpath1 = dirpath[len(dpath):].lstrip(os.sep) + os.sep
+            dirpath1 = dirpath[len(dpath):].lstrip(os.sep)
+            if dirpath1:
+                dirpath1 += os.sep
             if not self._check_dirname(dirpath1):
                 self.log.debug("Skipping dir: %s", dirpath1)
                 continue
