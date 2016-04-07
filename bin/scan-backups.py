@@ -212,7 +212,7 @@ class BaseManifestor(object):
         while tmp_manifest:
             tmp = tmp_manifest[:1000]
             tmp_manifest = tmp_manifest[1000:]
-            outnames = storage.filter_needed(map(lname, tmp))
+            outnames = storage.filter_needed(map(lname, tmp), self)
             if outnames:
                 outnames = set(outnames)
                 for t in tmp:
@@ -327,7 +327,7 @@ class BaseStorageInterface(object):
     def __init__(self, options):
         pass
 
-    def filter_needed(self, in_fnames, **kwargs):
+    def filter_needed(self, in_fnames, worker):
         """Take `in_fnames` list of (prefixed) input filenames, check with storage
 
             @return filtered list of names to compute MD5 sums for
@@ -341,7 +341,7 @@ class DryStorage(BaseStorageInterface):
     """Dry-run mode: just print results
     """
 
-    def filter_needed(self, in_fnames, **kwargs):
+    def filter_needed(self, in_fnames, worker):
         return in_fnames
 
     def write_manifest(self, worker):
