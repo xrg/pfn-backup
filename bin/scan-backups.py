@@ -37,7 +37,7 @@ def custom_options(parser):
 
     pgroup.add_option('-u', '--upload-to', help="URL of service to upload manifests onto")
     pgroup.add_option('-b', '--cookies-file', help='Cookie jar file')
-    pgroup.add_option('-k', '--insecure', help="Skip SSL certificate verification")
+    pgroup.add_option('-k', '--insecure', default=False, action='store_true', help="Skip SSL certificate verification")
     parser.add_option_group(pgroup)
 
 options.allow_include = 3
