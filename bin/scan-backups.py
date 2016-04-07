@@ -246,7 +246,7 @@ class SourceManifestor(BaseManifestor):
             This helps the algorithm get done with "easy" files, first, so that
             possible errors (on larger files, greatest probability) occur last
         """
-        self.in_manifest.sort(key=lambda x: x[1]['size'])
+        self.in_manifest.sort(key=lambda x: x['size'])
 
     def compute_sums(self, time_limit=False, size_limit=False):
         """Compute MD5 sums of `in_manifest` files into `out_manifest`
@@ -370,7 +370,7 @@ else:
 
 comp_kwargs = {}
 if options.opts.fast_run:
-    comp_kwargs['limit'] = 10.0 # sec
+    comp_kwargs['time_limit'] = 10.0 # sec
     comp_kwargs['size_limit'] = pow(1024.0, 3)
 
 if options.opts.mode == 'sources':
@@ -385,7 +385,7 @@ if options.opts.mode == 'sources':
     try:
         worker.compute_sums(**comp_kwargs)
     except KeyboardInterrupt:
-        log.info('Canceling by user request, will still save output in 2 sec')
+        log.warning('Canceling MD5 scan by user request, will still save output in 2 sec')
         time.sleep(2.0) # User can hit Ctrl+C, again, here
 
     if worker.out_manifest:
