@@ -170,6 +170,10 @@ class BaseManifestor(object):
             if not mf['md5sum']:
                 try:
                     mf['md5sum'] = self.md5sum(os.path.join(dpath, mf['name']))
+                except IOError, e:
+                    self.n_errors += 1
+                    self.log.warning("IOError on %s: %s", mf['name'], e)
+                    mf['md5sum'] = 'unreadable'
                 except Exception:
                     self.n_errors += 1
                     self.log.warning("Cannot compute %s", mf['name'], exc_info=True)
