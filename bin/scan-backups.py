@@ -267,6 +267,58 @@ class SourceManifestor(BaseManifestor):
         self._filter_in(self.in_manifest, self.prefix, storage)
 
 
+class VolumeManifestor(BaseManifestor):
+    log = logging.getLogger('manifestor.source')
+
+    def __init__(self, label=''):
+        super(VolumeManifestor, self).__init__()
+        self.manifest = []
+        self.label = ''
+
+
+    def scan_dir(self, dpath):
+        if not os.path.isdir(dpath):
+            self.log.error("Input arguments must be directories. \"%s\" is not", dpath)
+            self.n_errors += 1
+            return False
+        self.manifest += self._scan_dir(dpath)
+        return True
+
+
+    def sort_by_size(self):
+        """Put smaller files first
+
+            This helps the algorithm get done with "easy" files, first, so that
+            possible errors (on larger files, greatest probability) occur last
+        """
+        self.manifest.sort(key=lambda x: x['size'])
+
+    def compute_sums(self, time_limit=False, size_limit=False):
+        """Compute MD5 sums of `in_manifest` files into `out_manifest`
+
+            @param time_limit time (seconds) to stop after. Useful for test runs
+        """
+        in_manifest = self.manifest
+        out_manifest = []
+        try:
+            self._compute_sums(in_manifest, out_manifest,
+                            time_limit=time_limit, size_limit=size_limit)
+        finally:
+            # replace with ones that got computed, even on KeyboardInterrupt
+            self.manifest = out_manifest
+
+    def filter_in(self, storage):
+        """Check filenames of `in_manifest` against storage
+
+            storage can tell us if files need to be checked (MD5) at all,
+            it would be a waste of CPU+time to compute those already in.
+
+        """
+        self._filter_in(self.manifest, False, storage)
+
+    def write_args(self):
+        return {'label': self.label}
+
 class BaseStorageInterface(object):
     def __init__(self, options):
         pass
@@ -393,6 +445,29 @@ if options.opts.mode == 'sources':
     else:
         log.warning("No manifest entries, nothing to save")
 
+elif options.opts.mode == 'volume-dir':
+    if len(options.args) != 2:
+        log.error("Must supply 2 arguments: $0 <Label> <path>")
+        sys.exit(1)
+    
+    worker = VolumeManifestor(label=options.args[0])
+    worker.scan_dir(options.args[1])
+    # no need to filter, assume we want a full scan, again
+    
+    if options.opts.small_first:
+        log.debug("Sorting by size")
+        worker.sort_by_size()
+    
+    try:
+        worker.compute_sums(**comp_kwargs)
+    except KeyboardInterrupt:
+        log.warning('Canceling MD5 scan by user request, will still save output in 2 sec')
+        time.sleep(2.0) # User can hit Ctrl+C, again, here
+
+    if worker.manifest:
+        storage.write_manifest(worker.manifest)
+    else:
+        log.warning("No manifest entries, nothing to save")
 else:
     log.error("Invalid mode: %s", options.opts.mode)
     sys.exit(1)
