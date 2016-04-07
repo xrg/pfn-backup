@@ -394,7 +394,8 @@ class F3Storage(BaseStorageInterface):
     def filter_needed(self, in_fnames, worker):
         headers = {'Content-type': 'application/json', }
         post_data = {'mode': 'filter-needed', 'entries': in_fnames }
-        post_data.update(kwargs)
+        if 'vol_label' in worker.context:
+            post_data['vol_label'] = worker.context['vol_label']
         pres = self.rsession.post(self.upload_url, headers=headers,
                                   verify=self.ssl_verify,
                                   data=json.dumps(post_data)
