@@ -563,11 +563,12 @@ elif options.opts.mode == 'volume-dir':
 
 elif options.opts.mode in ('udisks', 'udisks2'):
     import dbus
-    from dbus.mainloop.glib import DBusGMainLoop
+    from dbus.mainloop.glib import DBusGMainLoop, threads_init
     import gobject
 
-    DBusGMainLoop(set_as_default=True)
     gobject.threads_init()
+    threads_init()
+    DBusGMainLoop(set_as_default=True)
     
     umgr = UDisks2Mgr()
     umgr.start_loop()
