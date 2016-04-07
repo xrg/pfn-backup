@@ -416,6 +416,27 @@ class F3Storage(BaseStorageInterface):
                                   data=json.dumps(post_data)
                                  )
         pres.raise_for_status()
+    
+    def lookup_fs(self, props):
+        headers = {'Content-type': 'application/json', }
+        post_data = {'mode': 'lookup',}
+        post_data.update(props)
+        pres = self.rsession.post(self.upload_url, headers=headers,
+                                  verify=self.ssl_verify,
+                                  data=json.dumps(post_data)
+                                 )
+        pres.raise_for_status()
+        return pres.json()
+
+def array2str(arr):
+    if isinstance(arr, basestring):
+        return arr
+    if isinstance(arr, dbus.Array) and arr.signature == 'y':
+        return ''.join(map(str, arr))
+    elif isinstance(arr, dbus.Array):
+        raise TypeError(arr.signature)
+    else:
+        raise TypeError(type(arr))
 
 class UDisks2Mgr(object):
     ORG_UDISKS2 = '/org/freedesktop/UDisks2'
@@ -424,14 +445,16 @@ class UDisks2Mgr(object):
 
     class Drive(object):
         def __init__(self, obj, iprops=None):
-            self._obj = obj # DBus object
+            self._obj = obj
             if iprops is None:
                 iprops = obj.GetAll('org.freedesktop.UDisks2.Drive', dbus_interface=dbus.PROPERTIES_IFACE)
     
         def eject(self):
+            self._obj.Eject({}, dbus_interface='org.freedesktop.UDisks2.Drive')
+
+        def is_ejectable(self):
             iface = dbus.Interface(self._obj, 'org.freedesktop.UDisks2.Drive')
-            if iface.Ejectable:
-                iface.Eject({})
+            return iface.Ejectable
 
     def __init__(self):
         self._bus = dbus.SystemBus()
@@ -452,13 +475,18 @@ class UDisks2Mgr(object):
             return
         self.log.debug("added interface: %s", path)
 
-        if 'org.freedesktop.UDisks2.Drive' in intf_properties:
+        if 'org.freedesktop.UDisks2.Job' in intf_properties:
+            pass
+        elif 'org.freedesktop.UDisks2.Swapspace' in intf_properties:
+            pass
+        elif 'org.freedesktop.UDisks2.Drive' in intf_properties:
             self.log.debug("it is a drive")
             self.get_drive(path, intf_properties.get('org.freedesktop.UDisks2.Drive', None))
         elif 'org.freedesktop.UDisks2.Filesystem' in intf_properties:
             self.log.debug("it contains a filesystem")
             self._scan_filesystem(path, intf_properties)
-        #elif '':
+        elif 'org.freedesktop.UDisks2.PartitionTable' in intf_properties:
+            pass
         else:
             self.log.debug("unknown interface: %r", map(str, intf_properties.keys()))
 
@@ -471,6 +499,12 @@ class UDisks2Mgr(object):
         if 'org.freedesktop.UDisks2.Drive' in intfs:
             self._drives.pop(path, None)
         
+        if 'org.freedesktop.UDisks2.Filesystem' in intfs:
+            self._queue_lock.acquire()
+            self._work_queue = filter(lambda t: t.path != path, self._work_queue)
+            # no notify needed, queue will only shrink
+            self._queue_lock.release()
+
     def main_loop(self, storage):
         """ This will start TWO threads: one for DBus signals and one for work-queue run
         
@@ -527,9 +561,77 @@ class UDisks2Mgr(object):
             self.log.debug("need to scan drive: %s", path)
             self._drives[path] = UDisks2Mgr.Drive(obj, i_props)
         return self._drives[path]
-        
+
+    class EjectTask(object):
+        def __init__(self, path, drive):
+            self.path = path
+            self.drive = drive
+
+        def execute(self, storage):
+            self.drive.eject()
+
+    class ScanTask(object):
+        log = logging.getLogger('tasks.scan')
+
+        def __init__(self, path, bus, block_props):
+            self.path = path
+            self._bus = bus
+            self.block_props = block_props
+            
+        def execute(self, storage):
+            props = { 'vol_label': self.block_props['IdLabel'],
+                       'uuid': self.block_props['IdUUID'],
+                       'size': self.block_props['Size'],
+                       'fstype': self.block_props['IdType'],
+                       }
+            device = array2str(self.block_props['Device'])
+            try:
+                res = storage.lookup_fs(props)
+                if not res:
+                    self.log.info("No need to scan %s",device )
+                    return
+                action = res.get('action', False)
+            except requests.exceptions.RequestException, e:
+                self.log.warning("Cannot lookup FS %s: %s", props['vol_label'], e)
+                return
+            except Exception, e:
+                self.log.warning("Cannot lookup FS %s: %s", props['vol_label'], e, exc_info=True)
+                return
+    
+            if action == 'scan':
+                return self.scan_volume(storage, device)
+            # elif action == 'rewind':
+            #    return self.rewind(storage)
+            else:
+                self.log.warning("Unknown volume action: %s", action)
+
+        def scan_volume(self, storage, device):
+            fs_obj = self._bus.get_object("org.freedesktop.UDisks2", self.path)
+            iface = dbus.Interface(fs_obj, 'org.freedesktop.UDisks2.Filesystem')
+            mount_opts = dbus.Dictionary({'ro': True}, 'sv')
+            mpoint = iface.Mount(mount_opts)
+            self.log.info("Mounted %s on %s", device, mpoint)
+
+            worker = VolumeManifestor(label=self.block_props['IdLabel'])
+            worker.scan_dir(mpoint)
+
+            umount_opts = dbus.Dictionary({}, 'sv')
+            try:
+                worker.compute_sums()
+                time.sleep(1.0)
+                iface.Unmount(umount_opts)
+            except KeyboardInterrupt:
+                log.warning('Canceling MD5 scan by user request, will still save output in 2 sec')
+                iface.Unmount(umount_opts)
+                time.sleep(2.0) # User can hit Ctrl+C, again, here
+
+            if worker.manifest:
+                storage.write_manifest(worker)
+            else:
+                log.warning("No manifest entries, nothing to save")
+
     def _scan_filesystem(self, path, props):
-        self.log.info("filesystem scan!") # *-*
+        self.log.debug("filesystem scan: %s", path)
         fs_obj = self._bus.get_object("org.freedesktop.UDisks2", path)
         if 'org.freedesktop.UDisks2.Block' in props:
             block_props = props['org.freedesktop.UDisks2.Block']
@@ -542,6 +644,9 @@ class UDisks2Mgr(object):
         drive = self.get_drive(drive_path)
         with self._queue_lock:
             if block_props['IdType'] in ('iso9660', 'udf', 'vfat'):
+                self._work_queue.append(UDisks2Mgr.ScanTask(path, self._bus, block_props))
+                if drive.is_ejectable:
+                    self._work_queue.append(UDisks2Mgr.EjectTask(path, drive))
                 self._queue_lock.notifyAll()
             else:
                 self.log.info("Ignoring %s filesystem on %s", block_props['IdType'], array2str(block_props['Device']))
