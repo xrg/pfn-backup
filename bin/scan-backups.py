@@ -15,10 +15,10 @@ import json
 import cookielib
 import hashlib
 import requests
-import socket
 import sys
 import optparse
 from openerp_libclient.extra import options
+import threading
 
 def custom_options(parser):
     assert isinstance(parser, optparse.OptionParser)
@@ -416,6 +416,91 @@ class F3Storage(BaseStorageInterface):
                                  )
         pres.raise_for_status()
 
+class UDisks2Mgr(object):
+    ORG_UDISKS2 = '/org/freedesktop/UDisks2'
+    DBUS_OBJMGR = 'org.freedesktop.DBus.ObjectManager'
+    log = logging.getLogger('udisks2')
+
+    class Drive(object):
+        def __init__(self, obj, iprops=None):
+            self._obj = obj # DBus object
+            if iprops is None:
+                iprops = obj.GetAll('org.freedesktop.UDisks2.Drive', dbus_interface=dbus.PROPERTIES_IFACE)
+    
+        def eject(self):
+            iface = dbus.Interface(self._obj, 'org.freedesktop.UDisks2.Drive')
+            if iface.Ejectable:
+                iface.Eject({})
+
+    def __init__(self):
+        self._bus = dbus.SystemBus()
+        self._drives = {}
+
+    def _setup_listeners(self):
+        """Setup DBus callbacks for notifications
+        """
+        self._bus.add_signal_receiver(self._interface_added, 'InterfacesAdded', self.DBUS_OBJMGR)
+        self._bus.add_signal_receiver(self._interface_removed, 'InterfacesRemoved', self.DBUS_OBJMGR)
+        
+    def _interface_added(self, path, intf_properties):
+        """Called by DBus when some drive or media is inserted
+        """
+        if not path.startswith(self.ORG_UDISKS2):
+            return
+        self.log.debug("added interface: %s", path)
+
+        if 'org.freedesktop.UDisks2.Drive' in intf_properties:
+            self.log.debug("it is a drive")
+            self.get_drive(path, intf_properties.get('org.freedesktop.UDisks2.Drive', None))
+        elif 'org.freedesktop.UDisks2.Filesystem' in intf_properties:
+            self.log.debug("it contains a filesystem")
+            self._scan_filesystem(path, intf_properties)
+        #elif '':
+        else:
+            self.log.debug("unknown interface: %r", map(str, intf_properties.keys()))
+
+    def _interface_removed(self, path, intfs):
+        """ Called by DBus when some media is removed
+        """
+        if not path.startswith(self.ORG_UDISKS2):
+            return
+        self.log.debug("interface removed: %s %r", path, map(str, intfs))
+        if 'org.freedesktop.UDisks2.Drive' in intfs:
+            self._drives.pop(path, None)
+        
+
+    def start_loop(self):
+        def __glib_loop():
+            loop = gobject.MainLoop()
+            loop.run()
+        thr = threading.Thread(target=__glib_loop)
+        thr.daemon=True
+        self._setup_listeners()
+        print "starting loop"
+        thr.start()
+
+    def get_drive(self, path, i_props=None):
+        if path not in self._drives:
+            obj = self._bus.get_object("org.freedesktop.UDisks2", path)
+            self.log.debug("need to scan drive: %s", path)
+            self._drives[path] = UDisks2Mgr.Drive(obj, i_props)
+        return self._drives[path]
+        
+    def _scan_filesystem(self, path, props):
+        self.log.info("filesystem scan!") # *-*
+        fs_obj = self._bus.get_object("org.freedesktop.UDisks2", path)
+        if 'org.freedesktop.UDisks2.Block' in props:
+            block_props = props['org.freedesktop.UDisks2.Block']
+        else:
+            block_props = fs_obj.GetAll('org.freedesktop.UDisks2.Block', dbus_interface=dbus.PROPERTIES_IFACE)
+        
+        drive_path = block_props['Drive']
+        self.log.debug("drive path: %s", drive_path)
+        self.log.debug("Found new %(IdType)s fs \"%(IdLabel)s\" of %(Size)s (UUID: %(IdUUID)s)" % block_props)
+        drive = self.get_drive(drive_path)
+        time.sleep(2)
+        drive.eject()
+
 if options.opts.upload_to:
     storage = F3Storage(options.opts)
 elif options.opts.output:
@@ -474,6 +559,22 @@ elif options.opts.mode == 'volume-dir':
         storage.write_manifest(worker)
     else:
         log.warning("No manifest entries, nothing to save")
+
+elif options.opts.mode in ('udisks', 'udisks2'):
+    import dbus
+    from dbus.mainloop.glib import DBusGMainLoop
+    import gobject
+
+    DBusGMainLoop(set_as_default=True)
+    gobject.threads_init()
+    
+    umgr = UDisks2Mgr()
+    umgr.start_loop()
+
+    while True:
+        time.sleep(5)
+
+
 else:
     log.error("Invalid mode: %s", options.opts.mode)
     sys.exit(1)
