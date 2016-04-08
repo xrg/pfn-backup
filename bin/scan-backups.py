@@ -19,6 +19,7 @@ import sys
 import optparse
 from openerp_libclient.extra import options
 import threading
+import shutil
 
 def custom_options(parser):
     assert isinstance(parser, optparse.OptionParser)
@@ -34,6 +35,7 @@ def custom_options(parser):
 
     pgroup.add_option('--prefix', help="Add this (directory) prefix to scanned paths")
     pgroup.add_option('-o', '--output', help="Write output JSON file (re-use existing data)")
+    pgroup.add_option('--outdir', help="Directory to move checked files into")
 
     pgroup.add_option('-u', '--upload-to', help="URL of service to upload manifests onto")
     pgroup.add_option('-b', '--cookies-file', help='Cookie jar file')
@@ -41,7 +43,7 @@ def custom_options(parser):
     parser.add_option_group(pgroup)
 
 options.allow_include = 3
-options._path_options += ['output', 'cookies_file' ]
+options._path_options += ['output', 'cookies_file', 'outdir']
 options.init(options_prepare=custom_options,
         have_args=None,
         config='~/.openerp/backup.conf', config_section=(),
@@ -277,6 +279,77 @@ class SourceManifestor(BaseManifestor):
         """
         self._filter_in(self.in_manifest, self.prefix, storage)
 
+class MoveManifestor(BaseManifestor):
+    """This one will only read filenames, check with storage and move files away
+    """
+    log = logging.getLogger('manifestor.move')
+
+    def __init__(self,prefix=None):
+        super(MoveManifestor, self).__init__()
+        self.in_manifest = []
+        self.move_manifest = []
+        self.prefix = prefix
+
+
+    def scan_dir(self, dpath):
+        if not os.path.isdir(dpath):
+            self.log.error("Input arguments must be directories. \"%s\" is not", dpath)
+            self.n_errors += 1
+            return False
+        self.in_manifest += self._scan_dir(dpath)
+        return True
+
+    def get_out_manifest(self):
+        raise RuntimeError("MoveManifestor shall not write its output")
+
+    def compute_sums(self, time_limit=False, size_limit=False):
+        raise RuntimeError("No computation allowed")
+
+    def filter_in(self, storage):
+        if self.prefix:
+            lname = lambda m: os.path.join(self.prefix, m['name'])
+        else:
+            lname = lambda m: m['name']
+
+        tmp_manifest = self.in_manifest
+        tmp_out_manifest = []
+        while tmp_manifest:
+            tmp = tmp_manifest[:1000]
+            tmp_manifest = tmp_manifest[1000:]
+            outnames = storage.filter_checked(map(lname, tmp), self)
+            if outnames:
+                outnames = set(outnames)
+                for t in tmp:
+                    if lname(t) in outnames:
+                        tmp_out_manifest.append(t)
+                        
+        self.move_manifest = tmp_out_manifest
+
+    def move_to(self, out_dir, dry=True):
+        """Move files of manifest into `out_dir`
+        """
+        new_dirs = set()
+        n_moved = 0
+
+        for mf in self.move_manifest:
+            src_fname = os.path.join(mf['base_path'], mf['name'])
+            out_fname = os.path.join(out_dir, mf['name'])
+            odir = os.path.dirname(out_fname)
+            if odir in new_dirs or os.path.isdir(odir):
+                pass
+            else:
+                log.info("Must create directory: %s", odir)
+                if not dry:
+                    os.makedirs(odir)
+                new_dirs.add(odir)
+
+            log.info("Move %s to %s", src_fname, out_fname)
+            if not dry:
+                shutil.move(src_fname, out_fname)
+            n_moved += 1
+
+        log.info("Moved %d files", n_moved)
+
 
 class VolumeManifestor(BaseManifestor):
     log = logging.getLogger('manifestor.source')
@@ -341,6 +414,15 @@ class BaseStorageInterface(object):
         """
         raise NotImplementedError
 
+    def filter_checked(self, in_fnames, worker):
+        """Find those of `in_fnames` which have been backed up
+        
+            Storage will determine policy, under which archives can be considered
+            safely backed
+        """
+        # by default, no file is considered safe
+        return []
+
     def write_manifest(self, worker):
         raise NotImplementedError
 
@@ -401,8 +483,21 @@ class F3Storage(BaseStorageInterface):
     def filter_needed(self, in_fnames, worker):
         headers = {'Content-type': 'application/json', }
         post_data = {'mode': 'filter-needed', 'entries': in_fnames }
-        if 'vol_label' in worker.context:
-            post_data['vol_label'] = worker.context['vol_label']
+        for key in ('vol_label', 'uuid', 'fstype'):
+            if key in worker.context:
+                post_data[key] = worker.context[key]
+        pres = self.rsession.post(self.upload_url, headers=headers,
+                                  verify=self.ssl_verify,
+                                  data=json.dumps(post_data)
+                                 )
+        pres.raise_for_status()
+        data = pres.json()
+        assert isinstance(data, list), type(data)
+        return data
+
+    def filter_checked(self, in_fnames, worker):
+        headers = {'Content-type': 'application/json', }
+        post_data = {'mode': 'filter-checked', 'entries': in_fnames }
         pres = self.rsession.post(self.upload_url, headers=headers,
                                   verify=self.ssl_verify,
                                   data=json.dumps(post_data)
@@ -728,6 +823,17 @@ elif options.opts.mode in ('udisks', 'udisks2'):
     
     umgr = UDisks2Mgr()
     umgr.main_loop(storage)
+
+elif options.opts.mode == 'move':
+    worker = MoveManifestor(options.opts.prefix)
+    for fpath in options.args:
+        worker.scan_dir(fpath)
+
+    worker.filter_in(storage)
+    if worker.move_manifest:
+        worker.move_to(options.opts.outdir, dry=options.opts.dry_run)
+    else:
+        log.warning("No manifest entries, nothing to move")
 
 else:
     log.error("Invalid mode: %s", options.opts.mode)
