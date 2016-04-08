@@ -50,7 +50,7 @@ if ! cat ${PGDATA}/postgresql.conf | parse_pg_conf | grep 'archive_mode = on' ; 
 	
 	echo "Patching ${PGDATA}/postgresql.conf"
 
-	sed -i.bak "s/#archive_mode\S*=.*/archive_mode = on/;s/#archive_command *= *''.*/archive_command = '\/usr\/lib\/pfn_backup\/pgsql_archive.sh \"%p\"'/;s/#archive_timeout\S*=\s*0/archive_timeout = 600/" ${PGDATA}/postgresql.conf
+	sed -i.bak "s/#archive_mode\s*=\s*/archive_mode = on/;s/#archive_command\s*=\s*''.*/archive_command = '\/usr\/lib\/pfn_backup\/pgsql_archive.sh \"%p\"'/;s/#archive_timeout\s*=\s*0/archive_timeout = 600/;s/#wal_level\s*=\s*minimal/wal_level = archive/" ${PGDATA}/postgresql.conf
 	
 fi
 
