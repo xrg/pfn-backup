@@ -124,10 +124,17 @@ class BaseManifestor(object):
                     self.log.debug("Skipping file: %s", f)
                     continue
                 full_f = os.path.join(dirpath, f)
-                this_size = os.path.getsize(full_f)
-                ret_manifest.append({'name': dirpath1 + f, 'size': this_size, 'md5sum': None, 'base_path': dpath})
-                n_files += 1
-                msize += this_size
+                try:
+                    this_size = os.path.getsize(full_f)
+                    ret_manifest.append({'name': dirpath1 + f, 'size': this_size, 'md5sum': None, 'base_path': dpath})
+                    n_files += 1
+                    msize += this_size
+                except EnvironmentError, e:
+                    self.log.warning("File %s cannot be stat'ed, defect on volume: %s", full_f, e)
+                    self.n_errors += 1
+                except Exception, e:
+                    self.log.warning("File %s cannot be stat'ed, defect on volume: %s", full_f, e)
+                    self.n_errors += 1
 
         self.log.info("Located %d/%d files totalling %s in %s", n_files, n_allfiles, sizeof_fmt(msize), dpath)
         self.n_files += n_files
