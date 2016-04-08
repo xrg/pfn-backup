@@ -48,7 +48,9 @@ let DISK_SIZE_LARGE=8000000
 let CLOSE_SIZE=1000
 MEDIA_BASE_NAME="dvd"
 
-. /etc/backup/options || true
+if [ -z "$BACKUP_DIR" ] ; then
+    . /etc/backup/options || true
+fi
 
 BK_DIR="$BACKUP_DIR/incoming/"
 BK_LARGE_DIR="$BACKUP_DIR/wontfit"
