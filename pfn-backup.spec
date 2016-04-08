@@ -24,6 +24,13 @@ Requires(postun): gnupg
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-buildroot
 %endif
 
+%package online
+Summary:        Pefnos Backup scripts (online mode)
+Group:          Archiving/
+BuildArch:      noarch
+Requires:       python-openerp-libclient
+Requires:       python-requests
+
 %description
 Pfn-backup is a set of shell (bash) scripts that direct GNU tar into
 making your everyday backups. Backups are stored on some local 
@@ -31,6 +38,10 @@ filesystem, which is then mirrored to any remote media.
 
 Note: in order to setup Postgresql hot-backup (PITR) for the first time,
 you may need to install this package with the Postgres server stopped.
+
+%description online
+Pfn-backup archives-sorting scripts. They are in Python, may connect to
+remote database and have extra dependencies.
 
 %prep
 %git_get_source
@@ -119,6 +130,11 @@ fi
 			%{_mandir}/man1/*.1*
 			%{_mandir}/man5/*.5*
 			%{_mandir}/man8/*.8*
+
+%files online
+%attr(0755,root,backup) %{_bindir}/prepare-media.py
+%attr(0755,root,backup) %{_bindir}/scan-backups.py
+
 
 %changelog -f %{_sourcedir}/%{name}-changelog.gitrpm.txt
 
