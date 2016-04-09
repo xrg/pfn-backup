@@ -354,10 +354,12 @@ class MoveManifestor(BaseManifestor):
 class VolumeManifestor(BaseManifestor):
     log = logging.getLogger('manifestor.source')
 
-    def __init__(self, label=''):
+    def __init__(self, label='', uuid=False):
         super(VolumeManifestor, self).__init__()
         self.manifest = []
         self.context['vol_label'] = label
+        if uuid:
+            self.context['uuid'] = uuid
 
     def get_out_manifest(self):
         return self.manifest
@@ -511,8 +513,9 @@ class F3Storage(BaseStorageInterface):
         headers = {'Content-type': 'application/json', }
         post_data = {'mode': 'upload', 'entries': worker.get_out_manifest() }
         url = self.upload_url
-        if 'vol_label' in worker.context:
-            post_data['vol_label'] = worker.context['vol_label']
+        for key in ('vol_label', 'uuid', 'fstype'):
+            if key in worker.context:
+                post_data[key] = worker.context[key]
         pres = self.rsession.post(url, headers=headers,
                                   verify=self.ssl_verify,
                                   data=json.dumps(post_data)
@@ -714,7 +717,8 @@ class UDisks2Mgr(object):
             mpoint = iface.Mount(mount_opts)
             self.log.info("Mounted %s on %s", device, mpoint)
 
-            worker = VolumeManifestor(label=self.block_props['IdLabel'])
+            worker = VolumeManifestor(label=self.block_props['IdLabel'],
+                                      uuid=self.block_props['IdUUID'])
             worker.scan_dir(mpoint)
 
             umount_opts = dbus.Dictionary({}, 'sv')
