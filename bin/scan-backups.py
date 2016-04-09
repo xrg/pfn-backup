@@ -77,7 +77,7 @@ class BaseManifestor(object):
     def get_out_manifest(self):
         raise NotImplementedError
 
-    def md5sum(self, full_path):
+    def md5sum(self, full_path, size_hint=0):
         """Compute MD5 sum of some file
 
             Fear not, the core of this algorithm is an OpenSSL C function,
@@ -85,6 +85,8 @@ class BaseManifestor(object):
             Using 1MB of buffer, this loop has been timed to perform as
             fast as the `md5sum` UNIX utility.
         """
+        ts = time.time()
+        r_size = 0L
         fp = open(full_path, 'rb')
 
         md5 = hashlib.md5()
@@ -93,7 +95,11 @@ class BaseManifestor(object):
                 data = fp.read(self.BS)
                 if not len(data):
                     break
+                r_size += len(data)
                 md5.update(data)
+                if time.time() - ts > 10.0:
+                    self.log.info("MD5sum compute: %s of %s", sizeof_fmt(r_size), sizeof_fmt(size_hint))
+                    ts = time.time()
         finally:
             fp.close()
 
@@ -182,7 +188,7 @@ class BaseManifestor(object):
 
             if not mf['md5sum']:
                 try:
-                    mf['md5sum'] = self.md5sum(os.path.join(dpath, mf['name']))
+                    mf['md5sum'] = self.md5sum(os.path.join(dpath, mf['name']), mf.get('size', 0L))
                 except IOError, e:
                     self.n_errors += 1
                     self.log.warning("IOError on %s: %s", mf['name'], e)
