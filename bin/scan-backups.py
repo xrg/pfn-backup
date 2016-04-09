@@ -517,7 +517,11 @@ class F3Storage(BaseStorageInterface):
 
     def write_manifest(self, worker):
         headers = {'Content-type': 'application/json', }
-        post_data = {'mode': 'upload', 'entries': worker.get_out_manifest() }
+        entries = worker.get_out_manifest()
+        if len(entries) == 1:
+            # Single-item parameters get simplified in Request Params handler
+            entries = [entries[0], {}]
+        post_data = {'mode': 'upload', 'entries': entries}
         url = self.upload_url
         for key in ('vol_label', 'uuid', 'fstype'):
             if key in worker.context:
