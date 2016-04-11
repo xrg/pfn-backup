@@ -85,14 +85,50 @@ class PMWorker(object):
               }
     fill_factor = 99.0
     
+    class DiskTypeAllowed(object):
+        def __init__(self, dtype, remaining=1000):
+            self.dtype = dtype
+            self.size_mb = PMWorker.disk_sizes[dtype]
+            self.size_bytes = long(self.size_mb) * MB
+            self.count = 0
+            self.remaining = int(remaining)
+            self.fill_factor = PMWorker.fill_factor
+        
+        def increment(self):
+            self.count += 1
+            self.remaining -= 1
+
+        def make_new(self):
+            if not self.remaining:
+                return None
+            self.count += 1
+            self.remaining -= 1
+
+            return { 'name': False,
+                        'path': False,
+                        'size': self.size_mb,
+                        'type': self.dtype,
+                        'remaining': long(self.size_bytes * self.fill_factor / 100.0),
+                        'old_files': [],
+                        'new_files': [],
+                        'num': self.count
+                    }
+
     def __init__(self, allowed_media=None, wontfit_dir=None,
-                 path_pattern='disk%02d', sector_size=2048, start_from=1):
-        self.allowed_media = allowed_media or []
+                 path_pattern='disk%02d', sector_size=2048, start_from=1, use_dtype=True):
+        self.allowed_media = []
+        for a in allowed_media:
+            if ':' in a:
+                a, rem = a.split(':',1)
+                self.allowed_media.append(PMWorker.DiskTypeAllowed(a, rem))
+            else:
+                self.allowed_media.append(PMWorker.DiskTypeAllowed(a))
+
         self.volume_dir = False
         self.start_from = int(start_from)
         self.wontfit_dir = wontfit_dir
         self.sector_size = sector_size
-        self.max_size = max([self.disk_sizes[s] * MB for s in self.allowed_media])
+        self.max_size = max([s.size_mb * MB for s in self.allowed_media])
         self.log.info("Max volume size: %s", self.sizeof_fmt(self.max_size))
         self.n_errors = 0
         self.file_pos = 0
@@ -148,8 +184,9 @@ class PMWorker(object):
                     'new_files': [],
                     }
         # compute possible size:
-        for dtype in self.allowed_media:
-            if self.disk_sizes[dtype] * MB >= tsize:
+        for amedia in self.allowed_media:
+            if amedia.size_bytes >= tsize:
+                amedia.increment()
                 new_dest['type'] = dtype
                 new_dest['size'] = self.disk_sizes[dtype]
                 new_dest['remaining'] = (new_dest['size'] * MB) - tsize
@@ -159,6 +196,7 @@ class PMWorker(object):
             new_dest['size'] = tsize / MB
             new_dest['remaining'] = 0L
         
+        new_dest['num'] = len(self.dest_manifests)+1
         self.dest_manifests.append(new_dest)
         return True
         
@@ -197,14 +235,32 @@ class PMWorker(object):
         """ Process, distribute source archives into dest manifests
         """
         self.src_manifest.sort(key=itemgetter(1), reverse=True)
-        self.dest_manifests.sort(key=itemgetter('remaining'))
         in_manifest = self.src_manifest
+        warn_end_disks = True
         while in_manifest:
             if in_manifest[0][1] > self.max_size:
                 self.wontfit_files.append(in_manifest.pop(0))
                 continue
     
             # sort by /least/ remaining size
+            self.dest_manifests.sort(key=itemgetter('remaining'))
+            avail_size = 0L # max avail size both in existing and allowed media
+            for am in self.allowed_media:
+                if am.remaining and am.size_bytes > avail_size:
+                    avail_size = am.size_bytes
+            if self.dest_manifests:
+                mf = self.dest_manifests[-1]
+                if (mf['remaining'] > 0) and (mf['remaining'] > avail_size):
+                    avail_size = mf['remaining']
+
+            # cleanup fast all these files that wouldn't fit
+            pos = 0
+            while in_manifest[pos][1] > avail_size:
+                pos += 1
+            if pos:
+                in_manifest[:] = in_manifest[pos:]
+                self.log.debug("Skipping %d files > %s", pos, self.sizeof_fmt(avail_size))
+
             for mf in self.dest_manifests:
                 remaining = mf['remaining']
                 if remaining <= 0:
@@ -220,27 +276,26 @@ class PMWorker(object):
                     remaining -= self.size_pad(entry[1])
                     mf['new_files'].append(entry)
                     if remaining <= 0:
+                        self.log.debug("Just filled disk: %s", mf['num'])
                         break
                 mf['remaining'] = remaining
             
             if in_manifest:
                 # not all archives could fit existing destinations
-                for dtype in self.allowed_media:
-                    if self.disk_sizes[dtype] * MB > in_manifest[0][1]:
-                        new_dest = { 'name': False,
-                                        'path': False,
-                                        'size': self.disk_sizes[dtype],
-                                        'type': dtype,
-                                        'remaining': long(self.disk_sizes[dtype] * MB * self.fill_factor / 100.0),
-                                        'old_files': [],
-                                        'new_files': [],
-                                    }
-                        self.dest_manifests.append(new_dest)
-                        self.log.debug("Will need new %s volume", dtype)
-                        break
+                for amedia in self.allowed_media:
+                    if amedia.size_bytes < in_manifest[0][1]:
+                        continue
+                    new_dest = amedia.make_new()
+                    if not new_dest:
+                        continue
+                    self.dest_manifests.append(new_dest)
+                    self.log.debug("Will need new %s volume (# %d)", amedia.dtype, amedia.count)
+                    break
                 else:
-                    # cannot reach here, because of "max_size" check at start of loop
-                    raise RuntimeError("No disk size can accomodate file of %s" % self.sizeof_fmt(in_manifest[0][1]))
+                    if warn_end_disks:
+                        log.warning("No disks left for file of size %s", self.sizeof_fmt(in_manifest[0][1]))
+                        warn_end_disks = False
+                    in_manifest.pop(0)
                 
         # Second pass: sort "new_files" on each destination
         for mf in self.dest_manifests:
