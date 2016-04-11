@@ -98,6 +98,7 @@ class PMWorker(object):
         self.file_pos = 0
         
         self.path_pattern = path_pattern
+        self.use_dtype = use_dtype
         
         # manifests (aka. lists of files on volumes)
         self.src_manifest = []
@@ -269,7 +270,10 @@ class PMWorker(object):
         for mf in self.dest_manifests:
             if not mf['path']:
                 while True:
-                    new_path = os.path.join(self.volume_dir, self.path_pattern % disk_num)
+                    if self.use_dtype:
+                        new_path = os.path.join(self.volume_dir, mf['type'], self.path_pattern % disk_num)
+                    else:
+                        new_path = os.path.join(self.volume_dir, self.path_pattern % disk_num)
                     if new_path not in old_paths:
                         break
                     disk_num += 1
@@ -288,8 +292,8 @@ class PMWorker(object):
             if not mf['path']:
                 raise RuntimeError("No path for dest volume")
             if not os.path.exists(mf['path']):
-                os.mkdir(mf['path']) # only last element, otherwise error
-            
+                os.makedirs(mf['path'])
+
             for nf in mf['new_files']:
                 bd = os.path.join(mf['path'], os.path.dirname(nf[0]))
                 if not os.path.exists(bd):
