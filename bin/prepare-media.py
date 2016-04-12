@@ -76,14 +76,14 @@ class PMWorker(object):
     log = logging.getLogger('pmworker')
     disk_sizes = { # In MBytes
               'cd':       700.0,
-              'dvd':      4589.84,
+              'dvd':      4489.25,
               'dvd-dl':   8140.8,
               'bd-sl':   23098.0, # unformatted: 23866.0
-              #'bd-dl':   47732.0,
+              'bd-dl':   46196.0, # unformatted: 47732.0
               #'bd-tl':   95466.0,
               #'bd-ql':  122072.0,
               }
-    fill_factor = 99.0
+    fill_factor = 99.7
     
     class DiskTypeAllowed(object):
         def __init__(self, dtype, remaining=1000):
