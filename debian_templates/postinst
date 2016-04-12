@@ -1,0 +1,33 @@
+#!/bin/sh
+
+groupadd backup
+
+touch /var/backup/index
+chmod 644 /var/backup/index
+chown root /var/backup/index
+chgrp backup /var/backup/index
+
+if [ -d "CHANGEME/pgsql" ] ; then
+        if ! /usr/lib/pfn_backup/setup_postgres.sh ; then
+                echo "Cannot automatically setup Postgres for hot backup."
+                echo "Please run %{libndir}/pfn_backup/setup_postgres.sh"
+        fi
+fi
+
+chmod 755 /usr/bin/user-backup.sh /usr/bin/prepare-media.sh \
+ /usr/sbin/all-backup.sh /usr/sbin/backup-encrypt.sh \
+ /usr/sbin/usb-backup.sh /etc/cron.daily/multistage-backup.sh \
+ /usr/lib/pfn_backup/* /usr/lib/hal/scripts/usb-rsync-callout
+
+chown root /usr/bin/user-backup.sh /usr/bin/prepare-media.sh \
+ /usr/sbin/all-backup.sh /usr/sbin/backup-encrypt.sh \
+ /usr/sbin/usb-backup.sh /etc/cron.daily/multistage-backup.sh \
+ /usr/lib/pfn_backup/* /usr/lib/hal/scripts/usb-rsync-callout
+
+chgrp root /usr/sbin/all-backup.sh /usr/sbin/backup-encrypt.sh \
+ /usr/sbin/usb-backup.sh /etc/cron.daily/multistage-backup.sh \
+ /usr/lib/pfn_backup/* /usr/lib/hal/scripts/usb-rsync-callout
+
+chgrp backup /usr/bin/user-backup.sh /usr/bin/prepare-media.sh \
+ /var/backup
+
