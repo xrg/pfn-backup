@@ -4,7 +4,7 @@
 #	Author:	Jimmy Angelakos <vyruss@hellug.gr>
 
 # Variables to be passed on to the package
-version=0.5.2
+version=0.9.1
 maintainer="Jimmy Angelakos <vyruss@hellug.gr>"
 
 # Make temp dir
