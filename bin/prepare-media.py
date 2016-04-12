@@ -255,7 +255,7 @@ class PMWorker(object):
 
             # cleanup fast all these files that wouldn't fit
             pos = 0
-            while in_manifest[pos][1] > avail_size:
+            while (pos < len(in_manifest)) and in_manifest[pos][1] > avail_size:
                 pos += 1
             if pos:
                 in_manifest[:] = in_manifest[pos:]
