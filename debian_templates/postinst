@@ -17,16 +17,16 @@ fi
 chmod 755 /usr/bin/user-backup.sh /usr/bin/prepare-media.sh \
  /usr/sbin/all-backup.sh /usr/sbin/backup-encrypt.sh \
  /usr/sbin/usb-backup.sh /etc/cron.daily/multistage-backup.sh \
- /usr/lib/pfn_backup/* /usr/lib/hal/scripts/usb-rsync-callout
+ /usr/lib/pfn_backup/*
 
 chown root /usr/bin/user-backup.sh /usr/bin/prepare-media.sh \
  /usr/sbin/all-backup.sh /usr/sbin/backup-encrypt.sh \
  /usr/sbin/usb-backup.sh /etc/cron.daily/multistage-backup.sh \
- /usr/lib/pfn_backup/* /usr/lib/hal/scripts/usb-rsync-callout
+ /usr/lib/pfn_backup/*
 
 chgrp root /usr/sbin/all-backup.sh /usr/sbin/backup-encrypt.sh \
  /usr/sbin/usb-backup.sh /etc/cron.daily/multistage-backup.sh \
- /usr/lib/pfn_backup/* /usr/lib/hal/scripts/usb-rsync-callout
+ /usr/lib/pfn_backup/*
 
 chgrp backup /usr/bin/user-backup.sh /usr/bin/prepare-media.sh \
  /var/backup
