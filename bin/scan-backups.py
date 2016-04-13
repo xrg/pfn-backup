@@ -156,7 +156,7 @@ class BaseManifestor(object):
 
 
     def _compute_sums(self, in_manifest, out_manifest, prefix=False,
-                      time_limit=False, size_limit=False):
+                      time_limit=False, size_limit=False, file_limit=False):
         """Read files from `in_manifest`, compute their MD5 sums, put in `out_manifest`
 
             If a file is already in `out_manifest`, skip
@@ -176,6 +176,8 @@ class BaseManifestor(object):
                 self.log.debug("Stopping on deadline")
                 break
             if size_limit and done_size > size_limit:
+                break
+            if file_limit and dnum > file_limit:
                 break
 
             mf = in_manifest.pop(0)
