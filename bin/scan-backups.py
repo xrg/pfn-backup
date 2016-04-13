@@ -494,6 +494,9 @@ class BaseStorageInterface(object):
         """
         raise NotImplementedError
 
+    def test(self):
+        return 'OK'
+
 class DryStorage(BaseStorageInterface):
     """Dry-run mode: just print results
     """
@@ -632,6 +635,13 @@ class F3Storage(BaseStorageInterface):
                                  )
         pres.raise_for_status()
         return pres.json()
+
+    def test(self):
+        post_data = {'mode': 'test'}
+        pres = self.rsession.post(self.upload_url, data=post_data,
+                                  verify=self.ssl_verify )
+        pres.raise_for_status()
+        return pres.text
 
 def array2str(arr):
     if isinstance(arr, basestring):
@@ -949,6 +959,13 @@ elif options.opts.mode == 'move':
         worker.move_to(options.opts.outdir, dry=options.opts.dry_run)
     else:
         log.warning("No manifest entries, nothing to move")
+
+elif options.opts.mode == 'test':
+    try:
+        print storage.test()
+    except Exception, e:
+        log.error("Storage is not ready: %s", e)
+        sys.exit(3)
 
 else:
     log.error("Invalid mode: %s", options.opts.mode)
