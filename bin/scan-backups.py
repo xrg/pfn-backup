@@ -667,15 +667,16 @@ class UDisks2Mgr(object):
     def _setup_listeners(self):
         """Setup DBus callbacks for notifications
         """
-        self._bus.add_signal_receiver(self._interface_added, 'InterfacesAdded', self.DBUS_OBJMGR)
-        self._bus.add_signal_receiver(self._interface_removed, 'InterfacesRemoved', self.DBUS_OBJMGR)
-        
+        obj = self._bus.get_object("org.freedesktop.UDisks2", self.ORG_UDISKS2)
+        obj.connect_to_signal('InterfacesAdded', self._interface_added, dbus_interface=self.DBUS_OBJMGR)
+        obj.connect_to_signal('InterfacesRemoved', self._interface_removed, dbus_interface=self.DBUS_OBJMGR)
+
     def _interface_added(self, path, intf_properties):
         """Called by DBus when some drive or media is inserted
         """
+        self.log.debug("added interface: %s", path)
         if not path.startswith(self.ORG_UDISKS2):
             return
-        self.log.debug("added interface: %s", path)
 
         if 'org.freedesktop.UDisks2.Job' in intf_properties:
             pass
