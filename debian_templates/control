@@ -9,5 +9,4 @@ Architecture: all
 Maintainer: @maintainer
 Description: Pfn-backup is a set of shell (bash) scripts that direct GNU tar into making your everyday backups.
  Pfn-backup is a set of shell (bash) scripts that direct GNU tar into making your everyday backups. Backups are stored on some local filesystem, which is then mirrored to any remote media.
- 
  Note: in order to setup Postgresql hot-backup (PITR) for the first time, you may need to install this package with the Postgres server stopped.
