@@ -735,7 +735,8 @@ class UDisks2Mgr(object):
                 if task is None:
                     continue
                 try:
-                    task.execute(storage)
+                    task_thr = threading.Thread(target=task.execute, args=(storage,))
+                    task_thr.start()
                 except Exception:
                     self.log.exception("Cannot perform %s:", task, exc_info=True)
 
@@ -776,8 +777,9 @@ class UDisks2Mgr(object):
     class ScanTask(object):
         log = logging.getLogger('tasks.scan')
 
-        def __init__(self, path, bus, block_props):
+        def __init__(self, path, drive, bus, block_props):
             self.path = path
+            self.drive = drive
             self._bus = bus
             self.block_props = block_props
             
@@ -802,11 +804,17 @@ class UDisks2Mgr(object):
                 return
     
             if action == 'scan':
-                return self.scan_volume(storage, device)
+                ret = self.scan_volume(storage, device)
             # elif action == 'rewind':
             #    return self.rewind(storage)
             else:
                 self.log.warning("Unknown volume action: %s", action)
+            
+            if self.drive and self.drive.is_ejectable():
+                time.sleep(1.0)
+                self.drive.eject()
+            
+            return ret
 
         def scan_volume(self, storage, device):
             fs_obj = self._bus.get_object("org.freedesktop.UDisks2", self.path)
@@ -843,12 +851,13 @@ class UDisks2Mgr(object):
         drive = self.get_drive(drive_path)
         with self._queue_lock:
             if block_props['IdType'] in ('iso9660', 'udf', 'vfat'):
-                self._work_queue.append(UDisks2Mgr.ScanTask(path, self._bus, block_props))
-                if drive.is_ejectable:
-                    self._work_queue.append(UDisks2Mgr.EjectTask(path, drive))
+                self._work_queue.append(UDisks2Mgr.ScanTask(path, drive, self._bus, block_props))
                 self._queue_lock.notifyAll()
             else:
                 self.log.info("Ignoring %s filesystem on %s", block_props['IdType'], array2str(block_props['Device']))
+                if drive.is_ejectable:
+                    self._work_queue.append(UDisks2Mgr.EjectTask(path, drive))
+                self._queue_lock.notifyAll()
 
 if options.opts.upload_to:
     storage = F3Storage(options.opts)
