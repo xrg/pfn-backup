@@ -940,6 +940,9 @@ elif options.opts.mode == 'move':
 
     worker.filter_in(storage)
     if worker.move_manifest:
+        if not options.opts.outdir:
+            log.error("Move mode requested but no output dir, aborting")
+            sys.exit(1)
         worker.move_to(options.opts.outdir, dry=options.opts.dry_run)
     else:
         log.warning("No manifest entries, nothing to move")
