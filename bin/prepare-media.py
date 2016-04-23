@@ -187,8 +187,8 @@ class PMWorker(object):
         for amedia in self.allowed_media:
             if amedia.size_bytes >= tsize:
                 amedia.increment()
-                new_dest['type'] = dtype
-                new_dest['size'] = self.disk_sizes[dtype]
+                new_dest['type'] = amedia.dtype
+                new_dest['size'] = self.disk_sizes[amedia.dtype]
                 new_dest['remaining'] = (new_dest['size'] * MB) - tsize
                 break
         else:
