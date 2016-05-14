@@ -824,13 +824,19 @@ class UDisks2Mgr(object):
                 self.log.warning("Cannot lookup FS %s: %s", props['vol_label'], e, exc_info=True)
                 return
     
-            if action == 'scan':
-                ret = self.scan_volume(storage, device)
-            # elif action == 'rewind':
-            #    return self.rewind(storage)
-            else:
-                self.log.warning("Unknown volume action: %s", action)
-            
+            try:
+                if action == 'scan':
+                    ret = self.scan_volume(storage, device)
+                # elif action == 'rewind':
+                #    return self.rewind(storage)
+                elif action == 'eject':
+                    pass
+                else:
+                    self.log.warning("Unknown volume action: %s", action)
+            except requests.exceptions.RequestException, e:
+                self.log.warning("Failed to scan volume: %s", props['vol_label'], exc_info=True)
+                ret = False
+
             if self.drive and self.drive.is_ejectable():
                 time.sleep(1.0)
                 self.drive.eject()
@@ -846,13 +852,19 @@ class UDisks2Mgr(object):
 
             worker = VolumeManifestor(label=self.block_props['IdLabel'],
                                       uuid=self.block_props['IdUUID'])
-            worker.scan_dir(mpoint)
-
             umount_opts = dbus.Dictionary({}, 'sv')
+            
             try:
+                worker.scan_dir(mpoint)
+                worker.filter_in(storage)
+
                 storage.consume_manifests(worker, worker.produce_sums())
                 time.sleep(1.0)
                 iface.Unmount(umount_opts)
+            except requests.exceptions.RequestException, e:
+                time.sleep(0.5)
+                iface.Unmount(umount_opts)
+                raise
             except KeyboardInterrupt:
                 log.warning('Canceling MD5 scan by user request, will still save output in 2 sec')
                 time.sleep(2.0) # User can hit Ctrl+C, again, here
@@ -925,7 +937,7 @@ elif options.opts.mode == 'volume-dir':
     
     worker = VolumeManifestor(label=options.args[0])
     worker.scan_dir(options.args[1])
-    # no need to filter, assume we want a full scan, again
+    worker.filter_in(storage)
     
     if options.opts.small_first:
         log.debug("Sorting by size")
