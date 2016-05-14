@@ -807,7 +807,12 @@ class UDisks2Mgr(object):
                        }
             device = array2str(self.block_props['Device'])
             try:
-                res = storage.lookup_fs(props)
+                if props['uuid'] or props['vol_label']:
+                    res = storage.lookup_fs(props)
+                else:
+                    self.log.warning("No UUID or volume label, cannot scan disk!")
+                    res = {'action': 'eject' }
+
                 if not res:
                     self.log.info("No need to scan %s",device )
                     return
