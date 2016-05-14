@@ -619,6 +619,9 @@ class F3Storage(BaseStorageInterface):
             self.log.info("Uploaded %d entries", batch_len)
             
         post2 = {'mode': 'upload', 'entries': [], 'final': True}
+        for key in ('vol_label', 'uuid', 'fstype'):
+            if key in worker.context:
+                post2[key] = worker.context[key]
         pres = self.rsession.post(url, headers=headers,
                                   verify=self.ssl_verify,
                                   data=json.dumps(post2)
