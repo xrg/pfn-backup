@@ -38,6 +38,7 @@ def custom_options(parser):
     pgroup.add_option('--outdir', help="Directory to move checked files into")
 
     pgroup.add_option('-u', '--upload-to', help="URL of service to upload manifests onto")
+    pgroup.add_option('--http-proxy', help="HTTP[s] proxy for uploading")
     pgroup.add_option('--http-no-env', default=False, action='store_true', help="Disable environment variables, for proxies and CA")
     pgroup.add_option('-b', '--cookies-file', help='Cookie jar file')
     pgroup.add_option('-k', '--insecure', default=False, action='store_true', help="Skip SSL certificate verification")
@@ -554,6 +555,8 @@ class F3Storage(BaseStorageInterface):
         self.rsession = requests.Session()
         if opts.http_no_env:
             self.rsession.trust_env = False
+        if opts.http_proxy:
+            self.rsession.proxies = {'http': opts.http_proxy, 'https': opts.http_proxy }
         cj = cookielib.MozillaCookieJar()
         if opts.cookies_file and os.path.exists(opts.cookies_file):
             cj.load(opts.cookies_file)
