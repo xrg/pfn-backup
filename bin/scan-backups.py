@@ -20,6 +20,7 @@ import optparse
 from openerp_libclient.extra import options
 import threading
 import shutil
+import subprocess
 
 def custom_options(parser):
     assert isinstance(parser, optparse.OptionParser)
@@ -382,6 +383,101 @@ class MoveManifestor(BaseManifestor):
 
         log.info("Moved %d files", n_moved)
 
+class CopyManifestor(BaseManifestor):
+    """Read filenames, copy those needed to be archived
+    
+        Copy is expected to be slow/expensive, will call `rsync` to have
+        a progress bar and remote destination ability
+    """
+    log = logging.getLogger('manifestor.copyneeded')
+
+    def __init__(self,prefix=None):
+        super(CopyManifestor, self).__init__()
+        self.in_manifest = []
+        self.cn_manifest = []
+        self.prefix = prefix
+
+
+    def scan_dir(self, dpath):
+        if not os.path.isdir(dpath):
+            self.log.error("Input arguments must be directories. \"%s\" is not", dpath)
+            self.n_errors += 1
+            return False
+        self.in_manifest += self._scan_dir(dpath)
+        return True
+
+    def get_out_manifest(self):
+        raise RuntimeError("MoveManifestor shall not write its output")
+
+    def compute_sums(self, time_limit=False, size_limit=False):
+        raise RuntimeError("No computation allowed")
+
+    def filter_in(self, storage):
+        if self.prefix:
+            lname = lambda m: os.path.join(self.prefix, m['name'])
+        else:
+            lname = lambda m: m['name']
+
+        tmp_manifest = self.in_manifest
+        tmp_out_manifest = []
+        while tmp_manifest:
+            tmp = tmp_manifest[:1000]
+            tmp_manifest = tmp_manifest[1000:]
+            checked = set( storage.filter_checked(map(lname, tmp), self) or [])
+            for t in tmp:
+                if lname(t) not in checked:
+                    tmp_out_manifest.append(t)
+
+        self.cn_manifest = tmp_out_manifest
+
+    def copy_to(self, out_dir, do_move=False, dry=True):
+        """Copy (rsync) manifest files to destination
+        """
+
+
+        # When given list of filenames, rsync destination must be final
+        # directory of destination. Hence manifest needs to be re-grouped
+        # per destination
+        total_size = 0L
+        dests = {}
+        
+        for mf in self.cn_manifest:
+            odir = os.path.dirname(mf['name'])
+            if odir:
+                odir += '/'
+            dests.setdefault(odir, []).append((os.path.join(mf['base_path'], mf['name']), mf['size']))
+            total_size += mf['size']
+        
+        self.log.info("Need to copy %d files, %s to %d directories", len(self.cn_manifest), sizeof_fmt(total_size), len(dests))
+        n_moved = 0
+        copied_size = 0L
+        base_args = ['rsync', '-aPh', ]
+        if dry:
+            base_args.append('--dry-run')
+        if do_move:
+            base_args.append('--remove-source-files')
+        if not out_dir.endswith('/'):
+            out_dir += '/'
+
+        for destdir, entries in dests.items():
+            while entries:
+                mfs = entries[:100]
+                entries = entries[100:]
+                args = base_args[:]
+                tmp_size = 0L
+                for et in mfs:
+                    args.append(et[0])
+                    tmp_size += et[1]
+                args.append(out_dir + destdir)
+                
+                subprocess.check_call(args) # rsync call!
+                self.log.info("done %d/%d files, %s / %s", n_moved, len(self.cn_manifest),
+                                sizeof_fmt(copied_size), sizeof_fmt(total_size))
+
+                n_moved += len(mfs)
+                copied_size += tmp_size
+
+        self.log.info("Copied %d files, %s", n_moved, sizeof_fmt(copied_size))
 
 class VolumeManifestor(BaseManifestor):
     log = logging.getLogger('manifestor.source')
@@ -982,6 +1078,21 @@ elif options.opts.mode == 'move':
         worker.move_to(options.opts.outdir, dry=options.opts.dry_run)
     else:
         log.warning("No manifest entries, nothing to move")
+
+elif (options.opts.mode == 'copy-needed' or options.opts.mode == 'move-needed'):
+    worker = CopyManifestor(options.opts.prefix)
+    for fpath in options.args:
+        worker.scan_dir(fpath)
+
+    worker.filter_in(storage)
+    if worker.cn_manifest:
+        if not options.opts.outdir:
+            log.error("Copy-needed mode requested but no output dir, aborting")
+            sys.exit(1)
+        worker.copy_to(options.opts.outdir, do_move=(options.opts.mode == 'move-needed'),
+                       dry=options.opts.dry_run)
+    else:
+        log.warning("No manifest entries, nothing to copy")
 
 elif options.opts.mode == 'test':
     try:
