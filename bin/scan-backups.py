@@ -960,7 +960,7 @@ class UDisks2Mgr(object):
                 storage.consume_manifests(worker, worker.produce_sums())
                 time.sleep(1.0)
                 iface.Unmount(umount_opts)
-            except requests.exceptions.RequestException, e:
+            except requests.exceptions.RequestException:
                 time.sleep(0.5)
                 iface.Unmount(umount_opts)
                 raise
