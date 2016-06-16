@@ -435,31 +435,31 @@ class CopyManifestor(BaseManifestor):
         """
 
 
-        # When given list of filenames, rsync destination must be final
-        # directory of destination. Hence manifest needs to be re-grouped
-        # per destination
+        # Will use "--relative" option which does create missing directories
+        # on the remote side. Hence, we need to launch `rsync` from the
+        # correct path
+       
         total_size = 0L
         dests = {}
         
         for mf in self.cn_manifest:
-            odir = os.path.dirname(mf['name'])
-            if odir:
-                odir += '/'
-            dests.setdefault(odir, []).append((os.path.join(mf['base_path'], mf['name']), mf['size']))
+            dests.setdefault(mf['base_path'], []).append((mf['name'], mf['size']))
             total_size += mf['size']
         
         self.log.info("Need to copy %d files, %s to %d directories", len(self.cn_manifest), sizeof_fmt(total_size), len(dests))
         n_moved = 0
         copied_size = 0L
-        base_args = ['rsync', '-aPh', ]
+        base_args = ['rsync', '-aPhR', ]
         if dry:
             base_args.append('--dry-run')
         if do_move:
             base_args.append('--remove-source-files')
         if not out_dir.endswith('/'):
             out_dir += '/'
+        if self.prefix:
+            out_dir += self.prefix + '/'
 
-        for destdir, entries in dests.items():
+        for base_dir, entries in dests.items():
             while entries:
                 mfs = entries[:100]
                 entries = entries[100:]
@@ -468,9 +468,9 @@ class CopyManifestor(BaseManifestor):
                 for et in mfs:
                     args.append(et[0])
                     tmp_size += et[1]
-                args.append(out_dir + destdir)
+                args.append(out_dir)
                 
-                subprocess.check_call(args) # rsync call!
+                subprocess.check_call(args, cwd=base_dir) # rsync call!
                 self.log.info("done %d/%d files, %s / %s", n_moved, len(self.cn_manifest),
                                 sizeof_fmt(copied_size), sizeof_fmt(total_size))
 
