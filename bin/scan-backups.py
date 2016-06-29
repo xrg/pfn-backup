@@ -471,11 +471,11 @@ class CopyManifestor(BaseManifestor):
                 args.append(out_dir)
                 
                 subprocess.check_call(args, cwd=base_dir) # rsync call!
-                self.log.info("done %d/%d files, %s / %s", n_moved, len(self.cn_manifest),
-                                sizeof_fmt(copied_size), sizeof_fmt(total_size))
 
                 n_moved += len(mfs)
                 copied_size += tmp_size
+                self.log.info("done %d/%d files, %s / %s", n_moved, len(self.cn_manifest),
+                                sizeof_fmt(copied_size), sizeof_fmt(total_size))
 
         self.log.info("Copied %d files, %s", n_moved, sizeof_fmt(copied_size))
 
