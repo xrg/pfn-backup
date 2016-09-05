@@ -21,6 +21,7 @@ from openerp_libclient.extra import options
 import threading
 import shutil
 import subprocess
+from collections import Counter, defaultdict
 
 def custom_options(parser):
     assert isinstance(parser, optparse.OptionParser)
@@ -383,6 +384,91 @@ class MoveManifestor(BaseManifestor):
 
         log.info("Moved %d files", n_moved)
 
+class OnlyGoodManifestor(MoveManifestor):
+    """This one will fetch size+MD5SUM, move bad files away
+    """
+    log = logging.getLogger('manifestor.move.bad')
+
+    def __init__(self,prefix=None):
+        super(OnlyGoodManifestor, self).__init__(prefix)
+        self.scan_manifest = []
+
+    def _get_bad_sums(self):
+        sums_bad = defaultdict(long)
+        counts_bad = Counter([t['bad'] for t in self.move_manifest])
+        for t in self.move_manifest:
+            sums_bad[t['bad']] += t['size']
+
+        sents = []
+        for key, count in counts_bad.items():
+            sents.append("%s: %d %s" % (key, count,  sizeof_fmt(sums_bad[key])))
+
+        return ', '.join(sents)
+
+    def filter_in(self, storage):
+        if self.prefix:
+            lname = lambda m: os.path.join(self.prefix, m['name'])
+        else:
+            lname = lambda m: m['name']
+
+        tmp_manifest = self.in_manifest
+        tmp_out_manifest = []
+        tmp_scan_manifest = []
+        while tmp_manifest:
+            tmp = tmp_manifest[:1000]
+            tmp_manifest = tmp_manifest[1000:]
+            ldetails = storage.get_details(map(lname, tmp), self)
+            
+            fdetails = {}
+            if ldetails:
+                for name, size, md5sum, policy in ldetails:
+                    fdetails[name] = (size, md5sum, policy)
+            
+            for t in tmp:
+                dets = fdetails.get(lname(t), None)
+                if not dets:
+                    t['bad'] = 'unknown'
+                elif dets[2] == 'destroy':
+                    t['bad'] = dets[2]
+                elif dets[0] != t['size']:
+                    t['bad'] = 'size'
+                elif dets[1] != t['md5sum']:
+                    # No md5sum computed so far, most likely end up here
+                    t['orig_md5sum'] = dets[1]
+                    t['orig_name'] = t['name']
+                    tmp_scan_manifest.append(t)
+                    continue
+                else:
+                    # good entry, don't append to out_manifest
+                    continue
+                tmp_out_manifest.append(t)
+
+        self.scan_manifest = tmp_scan_manifest
+        self.move_manifest = tmp_out_manifest
+
+    def sort_by_size(self):
+        """Put smaller files first
+        """
+        self.scan_manifest.sort(key=lambda x: x['size'])
+
+    def compute_sums(self, time_limit=False, size_limit=False):
+        """Compute MD5 sums of `scan_manifest` files into `move_manifest`
+        
+            This step is optional. Non-md5-matching files will only be moved
+            if this function is called.
+        """
+
+        tmp_out_manifest = []
+        self._compute_sums(self.scan_manifest, tmp_out_manifest, prefix=self.prefix,
+                           time_limit=time_limit, size_limit=size_limit)
+        for t in tmp_out_manifest:
+            if t['orig_md5sum'] != t['md5sum']:
+                t['bad'] = 'md5sum'
+                t['name'] = t.pop('orig_name') # bring that back, remove prefix
+                self.move_manifest.append(t)
+
+        return
+
 class CopyManifestor(BaseManifestor):
     """Read filenames, copy those needed to be archived
     
@@ -578,6 +664,11 @@ class BaseStorageInterface(object):
         """
         # by default, no file is considered safe
         return []
+    
+    def get_details(self, in_fnames, worker):
+        """Return list of `(fname, size, MD5SUM, policy)` for each of `in_fnames`
+        """
+        raise NotImplementedError
 
     def write_manifest(self, worker):
         raise NotImplementedError
@@ -677,6 +768,20 @@ class F3Storage(BaseStorageInterface):
     def filter_checked(self, in_fnames, worker):
         headers = {'Content-type': 'application/json', }
         post_data = {'mode': 'filter-checked', 'entries': in_fnames }
+        pres = self.rsession.post(self.upload_url, headers=headers,
+                                  verify=self.ssl_verify,
+                                  data=json.dumps(post_data)
+                                 )
+        pres.raise_for_status()
+        data = pres.json()
+        assert isinstance(data, list), type(data)
+        return data
+
+    def get_details(self, in_fnames, worker):
+        """Return list of `(fname, size, MD5SUM, policy)` for each of `in_fnames`
+        """
+        headers = {'Content-type': 'application/json', }
+        post_data = {'mode': 'get-details', 'entries': in_fnames }
         pres = self.rsession.post(self.upload_url, headers=headers,
                                   verify=self.ssl_verify,
                                   data=json.dumps(post_data)
@@ -1093,6 +1198,32 @@ elif (options.opts.mode == 'copy-needed' or options.opts.mode == 'move-needed'):
                        dry=options.opts.dry_run)
     else:
         log.warning("No manifest entries, nothing to copy")
+
+elif (options.opts.mode == 'move-bad' or options.opts.mode == 'move-md5-bad'):
+    worker = OnlyGoodManifestor(options.opts.prefix)
+    for fpath in options.args:
+        worker.scan_dir(fpath)
+
+    worker.filter_in(storage)
+    if options.opts.mode == 'move-md5-bad':
+        if options.opts.small_first:
+            log.debug("Sorting by size")
+            worker.sort_by_size()
+
+        try:
+            worker.compute_sums(**comp_kwargs)
+        except KeyboardInterrupt:
+            log.warning('Canceling MD5 scan by user request, will still move files in 2 sec')
+            time.sleep(2.0) # User can hit Ctrl+C, again, here
+
+    if worker.move_manifest:
+        log.info("Need to move %d entries: %s", len(worker.move_manifest), worker._get_bad_sums())
+        if not options.opts.outdir:
+            log.error("Move mode requested but no output dir, aborting")
+            sys.exit(1)
+        worker.move_to(options.opts.outdir, dry=options.opts.dry_run)
+    else:
+        log.warning("No bad entries, nothing to move")
 
 elif options.opts.mode == 'test':
     try:
