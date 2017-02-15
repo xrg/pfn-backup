@@ -8,6 +8,10 @@
 # this will force "/usr/lib/" even on 64-bit
 %define libndir %{_exec_prefix}/lib
 
+# This package is arch-specific (because of hal scripts)
+# yet it has no binaries
+%define debug_package %{nil}
+
 Name:		%{name}
 Version:	%{version}
 Release:	%{release}
