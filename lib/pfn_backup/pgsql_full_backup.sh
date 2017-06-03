@@ -6,6 +6,7 @@
 
 # exit on any non-handled error
 set -e
+trap 'echo Error at $0:$LINENO $BASH_COMMAND >&2 ; exit' ERR SIGINT SIGQUIT
 
 function decho {
  if [ "$VERBOSE" == "y" ] ; then
@@ -47,35 +48,16 @@ TSTAMP=$(date -Iminute)
 
 # we do name a capital P to avoid conflict with any other backup
 
-TAR_FILE="$BACKUP_DIR/backup-Pgsql-full-$DSTAMP.tar"
+TAR_FILE="$BACKUP_DIR/incoming/backup-Pgsql-full-$DSTAMP.tar.gz"
 
 [ -n "$BACKUP_INDEX_FILE" ] && \
 	echo "$TSTAMP" 'Pgsql' "Backup started now. full_$DSTAMP" >> "$BACKUP_INDEX_FILE"
 
 decho "Starting backup.."
+pg_basebackup -D "$BACKUP_DIR/pgsql/full-$DSTAMP" -F plain -R -x -U $PGSQL_BACKUP_USER
 
-# This should be printed anyway, since the psql will output as well.
-echo "Postgres full backup: SELECT pg_start_backup('full_$DSTAMP');"
-
-$PSQL_CMD -c "SELECT pg_start_backup('full_$DSTAMP');"
-tar -cf ${TAR_FILE} --exclude=pg_xlog $PGDATA/
-$PSQL_CMD -c "SELECT pg_stop_backup();"
-sleep 20
-tar -rf ${TAR_FILE} ${BACKUP_DIR}/pgsql/wals
-gzip ${TAR_FILE}
-mv ${TAR_FILE}.gz "$BACKUP_DIR/incoming"
-
-# do that as quicly (atomic) as possible. Still, the pgsql_archive.sh will
-# tolerate a missing wals/ 
-
-mv ${BACKUP_DIR}/pgsql/wals ${BACKUP_DIR}/pgsql/wals.old
-mkdir ${BACKUP_DIR}/pgsql/wals.new
-chown postgres ${BACKUP_DIR}/pgsql/wals.new
-chmod -R o-rwx ${BACKUP_DIR}/pgsql/wals.new
-mv ${BACKUP_DIR}/pgsql/wals.new ${BACKUP_DIR}/pgsql/wals
-
-# we have backed them up, remove them.
-rm -rf ${BACKUP_DIR}/pgsql/wals.old
+tar -czf ${TAR_FILE} -C "$BACKUP_DIR/pgsql/full-$DSTAMP" ./
+rm -rf "$BACKUP_DIR/pgsql/full-$DSTAMP"
 
 [ -n "$BACKUP_INDEX_FILE" ] && \
 	echo "$TSTAMP" $TAR_FILE Pgsql "success at" $(date) "." >> "$BACKUP_INDEX_FILE"
