@@ -468,6 +468,21 @@ class OnlyGoodManifestor(MoveManifestor):
                 self.move_manifest.append(t)
 
         return
+    
+    def explain_manifest(self):
+        by_bad = defaultdict(list)
+        for t in self.move_manifest:
+            by_bad[t['bad']].append(t)
+        
+        for bad in by_bad:
+            size = sum([t['size'] for t in by_bad[bad]])
+            self.log.info("Found %d entries, %s, with bad %s:", len(by_bad[bad]), sizeof_fmt(size), bad)
+            for t in by_bad[bad][:100]:
+                self.log.info("\t%s", t['name'])
+            if len(by_bad[bad]) > 100:
+                self.log.info("\t...")
+        
+        return
 
 class CopyManifestor(BaseManifestor):
     """Read filenames, copy those needed to be archived
@@ -1135,11 +1150,11 @@ if options.opts.mode == 'sources':
         log.warning("No manifest entries, nothing to save")
 
 elif options.opts.mode == 'volume-dir':
-    if len(options.args) != 2:
-        log.error("Must supply 2 arguments: $0 <Label> <path>")
+    if len(options.args) != 3:
+        log.error("Must supply 3 arguments: $0 <Label> <path> <uuid>")
         sys.exit(1)
     
-    worker = VolumeManifestor(label=options.args[0])
+    worker = VolumeManifestor(label=options.args[0], uuid=options.args[2])
     worker.scan_dir(options.args[1])
     worker.filter_in(storage)
     
@@ -1148,15 +1163,11 @@ elif options.opts.mode == 'volume-dir':
         worker.sort_by_size()
     
     try:
-        worker.compute_sums(**comp_kwargs)
+        storage.consume_manifests(worker, worker.produce_sums())
     except KeyboardInterrupt:
         log.warning('Canceling MD5 scan by user request, will still save output in 2 sec')
         time.sleep(2.0) # User can hit Ctrl+C, again, here
 
-    if worker.manifest:
-        storage.write_manifest(worker)
-    else:
-        log.warning("No manifest entries, nothing to save")
 
 elif options.opts.mode in ('udisks', 'udisks2'):
     import dbus
@@ -1220,6 +1231,7 @@ elif (options.opts.mode == 'move-bad' or options.opts.mode == 'move-md5-bad'):
         log.info("Need to move %d entries: %s", len(worker.move_manifest), worker._get_bad_sums())
         if not options.opts.outdir:
             log.error("Move mode requested but no output dir, aborting")
+            worker.explain_manifest()
             sys.exit(1)
         worker.move_to(options.opts.outdir, dry=options.opts.dry_run)
     else:
