@@ -124,6 +124,7 @@ fi
 %config(noreplace)	%{_sysconfdir}/backup/*
 %attr(0755,root,backup)	%{_bindir}/user-backup.sh
 %attr(0755,root,backup)	%{_bindir}/prepare-media.sh
+%attr(0755,root,backup)	%{_bindir}/backup-archive-dovetrash.sh
 %attr(0755,root,root)	%{_sbindir}/*
 %attr(0755,root,root)	%config(noreplace) %{_sysconfdir}/cron.daily/multistage-backup.sh
 %attr(0755,root,root)	%config(noreplace) %{_sysconfdir}/cron.monthly/pfn-full-backup
