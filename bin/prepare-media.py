@@ -208,7 +208,8 @@ class PMWorker(object):
         
         in_manifest = []
         msize = 0L
-        for dirpath, dirnames, filenames in os.walk(dpath, onerror=self.walk_error):
+        for dirpath, dirnames, filenames in os.walk(dpath, onerror=self.walk_error,
+                                                    followlinks=True):
             self.log.debug("Walking: %s", dirpath)
             if not filenames:
                 continue
