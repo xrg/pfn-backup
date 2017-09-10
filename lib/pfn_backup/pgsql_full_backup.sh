@@ -40,7 +40,6 @@ done
 # this dir must exist
 [ -d $PGDATA ]
 
-PSQL_CMD="/usr/bin/psql -U ${PGSQL_BACKUP_USER} -d ${PGSQL_BACKUP_DB}"
 DSTAMP=$(date +'%Y%m%d')
 TSTAMP=$(date -Iminute)
 
