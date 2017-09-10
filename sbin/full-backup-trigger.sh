@@ -25,7 +25,7 @@ if [ -e "$BACKUP_INDEX_FILE" ] ; then
 fi
 
 #TODO: a better cross-distro check for postgres
-if [ -e "/etc/init.d/postgresql" ] ; then
+if [ -e "/etc/init.d/postgresql" ] || which postgres > /dev/null ; then
 	echo "Need full postgres backup" > "$BACKUP_INDEX_FILE"
 else
 	echo > "$BACKUP_INDEX_FILE"
