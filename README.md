@@ -33,6 +33,7 @@ All these steps are incremental and repeatable, you can take extra
 backups or skip a step (on error), next time the scripts are run will
 cover the missing ones.
 
+
 ### Foreword: internals, setup
 
 Pfn-backup uses 3 locations on your (unix) system to store its configuration
@@ -122,4 +123,24 @@ whatsoever about your data and the way you store them using this tool. It's
 absolutely **your** duty to configure it correctly and verify that your
 backups contain the files you meant to preserve, are copied to a reliable
 place and your GPG key is handled properly.
+
+
+# Online mode
+
+As of version 0.9 , pfn-backup can work with an online database to manage
+the lifecycle of backup archives.
+
+Note that the remote database does **never** see into the contents of backups.
+
+The principle is trivial: an online database will keep track of all backup
+archives created on this machine, along with their hash[1]. Then, whenever
+backups need to be copied/transferred or stored to long-life media, that
+online database can index them and use the recorded hash to verify their
+integrity.
+
+
+[1] MD5 is used, because the goal is to protect against accidental corruption
+of archives; not intentional manipulation. CPU usage is important: pfn-backup
+should only use the least possible resources to operate, never interfere with
+the machine's mission.
 
