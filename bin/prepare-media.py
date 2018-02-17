@@ -7,9 +7,6 @@ import sys
 import optparse
 import os
 import os.path
-import subprocess
-import time
-import re
 import shutil
 from operator import itemgetter
 import collections
@@ -162,44 +159,77 @@ class PMWorker(object):
     def use_volume_dir(self, vdir):
         self.volume_dir = vdir
         for vd in os.listdir(vdir):
-            self._scan_dest_dir(os.path.join(vdir, vd))
+            dpath = os.path.join(vdir, vd)
+            if not os.path.isdir(dpath):
+                # files are legal here, will silently be ignored
+                continue
 
-    def _scan_dest_dir(self, dpath):
+            if self.use_dtype and vd in self.disk_sizes:
+                # standard hierarchy like "dvd/disk02/"
+                for vd2 in os.listdir(dpath):
+                    dpath2 = os.path.join(dpath, vd2)
+                    if not os.path.isdir(dpath2):
+                        continue
+
+                    new_dest = { 'name': dpath2,
+                            'path': dpath2,
+                            'old_files': [],
+                            'new_files': [],
+                            'type': vd,
+                            'size': self.disk_sizes[vd]
+                            }
+
+                    if vd2.startswith('disk'):
+                        new_dest['num'] = int(vd2[4:])
+                    self._scan_dest_dir(dpath2, new_dest)
+            else:
+                # some other dir, treat it as a disk
+                new_dest = { 'name': dpath,
+                            'path': dpath,
+                            'old_files': [],
+                            'new_files': [],
+                            }
+                self._scan_dest_dir(dpath, new_dest)
+
+        # Renumber destination manifests
+        for dm in self.dest_manifests:
+            if dm.get('num', 0) >= self.start_from:
+                self.start_from = dm['num'] + 1
+        for dm in self.dest_manifests:
+            if 'num' not in dm:
+                dm['num'] = self.start_from
+                self.start_from += 1
+
+    def _scan_dest_dir(self, dpath, new_dest):
         """scan existing volumes
             (+manifests TODO)
-        """
-        if not os.path.isdir(dpath):
-            # files are legal here, will silently be ignored
-            return False
 
-        self.log.debug("Found volume dir, scanning: %s", dpath)
+        """
+        self.log.debug("Found volume dir (%s), scanning: %s", new_dest.get('type', '?'), dpath)
         tsize = 0L
         for dirpath, dirnames, filenames in os.walk(dpath, onerror=self.walk_error):
             for f in filenames:
                 tsize += self.size_pad(os.path.getsize(os.path.join(dirpath, f)))
-        
-        new_dest = { 'name': dpath,
-                    'path': dpath,
-                    'old_files': [],
-                    'new_files': [],
-                    }
+
         # compute possible size:
-        for amedia in self.allowed_media:
-            if amedia.size_bytes >= tsize:
-                amedia.increment()
-                new_dest['type'] = amedia.dtype
-                new_dest['size'] = self.disk_sizes[amedia.dtype]
-                new_dest['remaining'] = (new_dest['size'] * MB) - tsize
-                break
-        else:
-            new_dest['type'] = '?'
-            new_dest['size'] = tsize / MB
-            new_dest['remaining'] = 0L
-        
-        new_dest['num'] = len(self.dest_manifests)+1
+        if 'type' not in new_dest:
+            for amedia in self.allowed_media:
+                if amedia.size_bytes >= tsize:
+                    amedia.increment()
+                    new_dest['type'] = amedia.dtype
+                    new_dest['size'] = self.disk_sizes[amedia.dtype]
+                    break
+            else:
+                new_dest['type'] = '?'
+                new_dest['size'] = tsize / MB
+                new_dest['remaining'] = 0L
+
+        if 'remaining' not in new_dest:
+            new_dest['remaining'] = (new_dest['size'] * MB) - tsize
+
         self.dest_manifests.append(new_dest)
         return True
-        
+
     def scan_source_dir(self, dpath):
         if not os.path.isdir(dpath):
             self.log.error("Input arguments must be directories. \"%s\" is not", dpath)
