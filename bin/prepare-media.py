@@ -385,6 +385,10 @@ class PMWorker(object):
                 if not os.path.exists(bd):
                     os.makedirs(bd)
                 self.log.debug("Moving %s to %s", nf[3], bd)
+                if os.path.exists(os.path.join(bd, os.path.basename(nf[0]))):
+                    # a `move` would silently replace the existing one,
+                    # better not to clobber.
+                    continue
                 shutil.move(nf[3], bd)
                 n_moved += 1
         self.log.info("Moved %d files to output directories", n_moved)
