@@ -351,7 +351,6 @@ class PMWorker(object):
                 old_paths.add(mf['path'])
             if mf['name']:
                 old_names.add(mf['name'])
-        
 
         for mf in self.dest_manifests:
             if not mf['path']:
