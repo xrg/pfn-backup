@@ -53,7 +53,7 @@ TAR_FILE="$BACKUP_DIR/incoming/backup-Pgsql-full-$DSTAMP.tar.gz"
 	echo "$TSTAMP" 'Pgsql' "Backup started now. full_$DSTAMP" >> "$BACKUP_INDEX_FILE"
 
 decho "Starting backup.."
-pg_basebackup -D "$BACKUP_DIR/pgsql/full-$DSTAMP" -F plain -R -x -U $PGSQL_BACKUP_USER
+pg_basebackup -D "$BACKUP_DIR/pgsql/full-$DSTAMP" -F plain -R -U $PGSQL_BACKUP_USER
 
 tar -czf ${TAR_FILE} -C "$BACKUP_DIR/pgsql/full-$DSTAMP" ./
 rm -rf "$BACKUP_DIR/pgsql/full-$DSTAMP"
